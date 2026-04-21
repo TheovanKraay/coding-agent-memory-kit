@@ -1,0 +1,11 @@
+{
+  "name": "repo-memory",
+  "version": "1.0.0",
+  "description": "Drop-in agent skill for persistent repo memory with Azure Cosmos DB",
+  "author": "Theo van Kraay",
+  "entrypoint": "SKILL.md",
+  "requires": {
+    "env": ["COSMOS_DB_ENDPOINT"],
+    "tools": ["python3", "git"]
+  }
+}

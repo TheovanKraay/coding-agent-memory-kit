@@ -1,127 +1,82 @@
 # coding-agent-memory-kit
 
-A cross-agent memory-as-artifact system that combines **repo-native markdown files** for persistent project knowledge with **Azure Cosmos DB** for real-time session memory.
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────┐
-│              Agent Session                   │
-│  ┌──────────────┐    ┌───────────────────┐  │
-│  │ SessionStore  │───▶│ CosmosSessionSync │  │
-│  │ (in-memory)   │    │ (Cosmos DB)       │  │
-│  └──────┬───────┘    └───────────────────┘  │
-│         │                                    │
-│         ▼                                    │
-│  ┌──────────────────┐                        │
-│  │ ArtifactUpdater   │──▶ DECISIONS.md       │
-│  │ (end of session)  │──▶ STATE.md           │
-│  │                   │──▶ FAILURES.md        │
-│  │                   │──▶ CHANGELOG.md       │
-│  └──────────────────┘                        │
-└─────────────────────────────────────────────┘
-```
-
-**Two-layer memory:**
-- **Layer 1 (Repo):** Markdown files checked into git — the source of truth. Human-readable, diffable, portable.
-- **Layer 2 (Cosmos DB):** Session turns, vector search, cross-agent sharing. Working memory that gets promoted to repo artifacts.
-
-## Installation
-
-```bash
-pip install -e .
-```
-
-Requires [AgentMemoryToolkit](https://github.com/theovankraay/AgentMemoryToolkit) for Cosmos DB features.
+A **drop-in agent skill** that gives any coding agent (Codex, Copilot, Claude, Cursor, etc.) persistent memory across sessions. Install it in your repo, point it at Azure Cosmos DB, and forget about it. The agent handles the rest.
 
 ## Quick Start
 
-```python
-from repo_memory import (
-    LongTermMemoryManager,
-    SessionMemoryStore,
-    MemoryArtifactUpdater,
-    AgentTranscriptAdapter,
-)
+1. **Copy the skill** into your repo:
+   ```bash
+   cp -r .github/skills/repo-memory/ your-repo/.github/skills/repo-memory/
+   ```
 
-# Manage repo markdown directly
-memory = LongTermMemoryManager(".")
-memory.update_state(StateEntry(item="Auth module", description="Implementing OAuth", agent_id="agent-1"))
-memory.log_decision(Decision(title="Use OAuth2", context="Need auth", decision="OAuth2", rationale="Industry standard"))
+2. **Create an Azure Cosmos DB NoSQL account** (just the account — the skill auto-creates the database and containers).
 
-# Track session turns
-store = SessionMemoryStore(session_id="sess-1", agent_id="agent-1")
-store.add_turn("user", "Build the login page")
-store.add_turn("agent", "Created login.html with OAuth flow")
+3. **Authenticate with Entra ID:**
+   ```bash
+   az login
+   ```
 
-# Convert from OpenAI/Anthropic formats
-turns = AgentTranscriptAdapter.from_openai(openai_messages)
+4. **Set your endpoint:**
+   ```bash
+   export COSMOS_DB_ENDPOINT="https://your-account.documents.azure.com:443/"
+   ```
 
-# Promote session findings to repo
-updater = MemoryArtifactUpdater(memory)
-updater.update_from_session(store, version="0.2.0")
+5. **Run setup:**
+   ```bash
+   bash .github/skills/repo-memory/setup.sh
+   ```
+
+That's it. Your agent reads `.github/skills/repo-memory/SKILL.md` and knows what to do.
+
+## How It Works
+
+```
+┌─────────────────────────────────────────────────┐
+│  Your Repo                                      │
+│                                                 │
+│  DECISIONS.md  STATE.md  CHANGELOG.md  ...      │  ← Human-readable, git-tracked
+│       │            │          │                  │
+│       └────────────┼──────────┘                  │
+│                    │                             │
+│         ## Session References                    │  ← Pointers to Cosmos DB (never chat content)
+│                    │                             │
+│  .github/skills/repo-memory/                    │
+│    SKILL.md        scripts/                     │  ← Agent reads SKILL.md, calls scripts
+│                      memory_sync.py             │
+└────────────────────┼────────────────────────────┘
+                     │
+              ┌──────▼──────┐
+              │  Cosmos DB  │  ← Session transcripts (searchable, cross-agent)
+              │  (NoSQL)    │
+              └─────────────┘
 ```
 
-## With Cosmos DB
+- **Markdown files** = long-term memory (decisions, state, failures). Git-tracked, human-readable.
+- **Cosmos DB** = session transcripts. Searchable, shared across agents. Never stored in the repo.
+- **Session References** = the bridge. Markdown files point to Cosmos DB sessions, never contain chat content.
 
-```python
-from agent_memory_toolkit import CosmosMemoryClient
-from repo_memory import CosmosSessionSync, SessionMemoryStore
-
-client = CosmosMemoryClient(
-    cosmos_endpoint="https://your-account.documents.azure.com",
-    cosmos_database="agent-memory",
-    cosmos_container="memories",
-)
-
-sync = CosmosSessionSync(client, user_id="project-1")
-store = SessionMemoryStore(agent_id="agent-1")
-
-# Rehydrate from previous session
-sync.rehydrate_session(store)
-
-# ... do work, add turns ...
-
-# Persist to Cosmos
-sync.sync_to_cosmos(store)
-
-# Semantic search
-results = sync.search_memories("authentication flow")
-```
-
-## Memory Files
+## Files Created in Your Repo Root
 
 | File | Purpose |
 |------|---------|
-| `AGENTS.md` | Registered agents and roles |
-| `STATE.md` | Work items: in progress, blocked, done |
-| `DECISIONS.md` | Architecture Decision Records with rationale |
-| `CHANGELOG.md` | Chronological change log |
-| `FAILURES.md` | Failures, root causes, and lessons |
+| `AGENTS.md` | Who works on this repo — humans and AI agents |
+| `STATE.md` | Current project state: in progress, blocked, done |
+| `DECISIONS.md` | Architecture Decision Records |
+| `CHANGELOG.md` | What changed, when, by whom |
+| `FAILURES.md` | What went wrong, lessons learned |
 
-## Modules
+## Configuration
 
-| Module | Class | Purpose |
-|--------|-------|---------|
-| `long_term_memory` | `LongTermMemoryManager` | Read/write repo markdown files |
-| `session_store` | `SessionMemoryStore` | In-memory session turn tracking |
-| `cosmos_sync` | `CosmosSessionSync` | Sync sessions to/from Cosmos DB |
-| `transcript_adapter` | `AgentTranscriptAdapter` | Convert OpenAI/Anthropic/raw formats |
-| `artifact_updater` | `MemoryArtifactUpdater` | Promote session data to repo artifacts |
-| `models` | Various | Pydantic models for all data types |
+| Environment Variable | Required | Default | Description |
+|---------------------|----------|---------|-------------|
+| `COSMOS_DB_ENDPOINT` | Yes | — | Your Cosmos DB account endpoint |
+| `COSMOS_DB_DATABASE` | No | `agent_memory` | Database name |
 
-## Documentation
+Auth is always **Entra ID** (`DefaultAzureCredential`). No connection strings, no keys in env vars.
 
-- [Architecture](docs/architecture.md) — Detailed system design
-- [Quick Start](docs/quickstart.md) — Getting started guide
-- [Extending](docs/extending.md) — How to add custom memory types
+## Agent Details
 
-## Testing
-
-```bash
-pip install -e ".[dev]"
-pytest
-```
+See [SKILL.md](.github/skills/repo-memory/SKILL.md) for the full agent instructions.
 
 ## License
 

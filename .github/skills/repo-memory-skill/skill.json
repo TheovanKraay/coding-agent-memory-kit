@@ -1,8 +1,0 @@
-{
-  "name": "repo-memory-skill",
-  "version": "0.1.0",
-  "description": "Cross-agent memory-as-artifact system with repo markdown and Cosmos DB session memory",
-  "author": "Theo van Kraay",
-  "tags": ["memory", "agents", "cosmos-db", "markdown"],
-  "entrypoint": "SKILL.md"
-}
