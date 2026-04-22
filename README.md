@@ -1,14 +1,43 @@
-# coding-agent-memory-kit
+# Memory as an Artifact
 
-A drop-in GitHub Skill that gives any coding agent persistent, searchable memory across sessions. Powered by [AgentMemoryToolkit](https://github.com/TheovanKraay/AgentMemoryToolkit) — this repo is a thin CLI wrapper and markdown convention layer on top of it.
+> **Memory as an Artifact** is the principle that an AI coding agent's project memory should be a first-class, version-controlled artifact — committed to the repo, readable by humans and agents alike, and portable everywhere the code goes.
 
-## The Problem
+**coding-agent-memory-kit** is the reference implementation of this principle.
 
-AI coding agents are powerful — but they have no lasting memory.
+---
 
-Every session with Copilot, Codex, Claude Code, or Cursor starts from scratch. The agent doesn't know what you decided last week, what approaches failed, what the current project state is, or why the architecture looks the way it does. That context lives in chat windows that are siloed per tool, per session, per machine.
+## The Concept
 
-This creates three concrete problems for developers:
+Today, every AI memory system stores memories *outside* the project — in vector databases, proprietary formats, or opaque cloud services. That memory is invisible to humans, locked to a single tool, and lost when you switch agents or machines.
+
+**Memory as an Artifact** inverts this. Project memory is treated the same way we treat code, documentation, and configuration:
+
+- It lives **in the repo**
+- It's **version-controlled** (full git history of how decisions evolved)
+- It's **human-readable** (structured markdown, not opaque embeddings)
+- It's **reviewable** (shows up in PRs, can be edited, discussed, approved)
+- It's **portable** (`git clone` and any agent, on any platform, has full context)
+- It's **shareable** (teammates get project memory the same way they get code)
+
+Raw session transcripts don't belong in the repo — they're noisy and large. Instead, the repo stores **structured distillations** (decisions, state, failures, lessons) and **pointers** to searchable session history in the cloud.
+
+### The Artifact Files
+
+| File | Purpose | Why it matters |
+|------|---------|----------------|
+| **`DECISIONS.md`** | Architectural Decision Records — what was decided, by whom, why | Agents stop re-debating settled questions. New team members understand rationale. |
+| **`STATE.md`** | Living project state — in progress, blocked, done | Any agent reads this on startup and knows exactly where things stand. |
+| **`FAILURES.md`** | What went wrong and lessons learned | Agents stop repeating the same mistakes. Institutional knowledge survives. |
+| **`CHANGELOG.md`** | What changed, when, by whom (human or agent) | Audit trail that travels with the code. |
+| **`AGENTS.md`** | Who works on this repo — humans and AI agents | Context for multi-agent and multi-developer collaboration. |
+
+These aren't log files. They're **living project artifacts** with defined structure and semantics, designed to be read by agents at session start and updated as work progresses.
+
+---
+
+## The Problem This Solves
+
+AI coding agents have no lasting memory. Every session starts from scratch.
 
 1. **Session amnesia.** You explain the same context over and over. The agent re-discovers things you already told it. Previous sessions might as well not have happened.
 
@@ -16,27 +45,19 @@ This creates three concrete problems for developers:
 
 3. **No shared project memory.** When a teammate (human or AI) picks up your work, they start from zero. There's no structured record of what was tried, what was decided, or what went wrong.
 
-Existing memory solutions don't solve this. Tools like MemSearch, MemPalace, Memvid, and Hindsight store memories in external databases (Milvus, ChromaDB, PostgreSQL, proprietary formats). That memory is opaque, not version-controlled, not human-readable, and not portable. Some tools like Claude Tandem add structured memory files, but they're locked to a single agent platform and have no cloud-backed session search.
+Existing memory solutions store memories in external databases (Milvus, ChromaDB, PostgreSQL, proprietary formats). That memory is opaque, not version-controlled, not human-readable, and not portable. Platform-specific tools like Claude Tandem add structured memory files, but they're locked to a single agent and have no cloud-backed session search.
 
-## What This Is
+---
 
-**coding-agent-memory-kit** is a memory system designed specifically for coding projects, built on a simple idea: **project memory should be an artifact** — committed to your repo, version-controlled alongside your code, readable by any human or agent, and portable everywhere your code goes.
+## How It Works
 
-It has two layers:
+**coding-agent-memory-kit** implements Memory as an Artifact with two layers:
 
-### Layer 1: Long-Term Memory (Repo Artifacts)
+### Layer 1: Long-Term Memory → Repo Artifacts
 
-Structured markdown files committed to your repo:
+The markdown files above, committed to your repo. Any agent that can read files has instant project context. No API calls, no database, no setup required for this layer.
 
-- **`DECISIONS.md`** — Architectural Decision Records. Why choices were made, by whom (human or agent), with full rationale.
-- **`STATE.md`** — Living project state. What's in progress, what's blocked, what's done.
-- **`FAILURES.md`** — What went wrong and lessons learned. Agents stop repeating the same mistakes.
-- **`CHANGELOG.md`** — What changed, when, and who did it.
-- **`AGENTS.md`** — Who works on this repo and in what capacity.
-
-These files are the long-term memory. They show up in PRs. They survive across agents, sessions, machines, and team members. Any agent that can read markdown picks up the full project context on session start — no vendor lock-in.
-
-### Layer 2: Short-Term Memory (Azure Cosmos DB)
+### Layer 2: Short-Term Memory → Azure Cosmos DB
 
 Full session transcripts, semantic search, fact extraction, thread summaries, and cross-session user profiles — powered by [AgentMemoryToolkit](https://github.com/TheovanKraay/AgentMemoryToolkit) and Azure Cosmos DB.
 
@@ -48,24 +69,20 @@ The repo stores **pointers** to Cosmos DB sessions (session ID, date, agent, thr
 - **Thread summaries** — compressed recaps of long sessions
 - **User profiles** — cross-session context that builds over time
 
-### What's Different Here
+### Where This Fits
 
-The landscape of AI memory tools is growing fast. Here's where this fits:
-
-| | Generic AI Memory (Mem0, MemSearch, Memvid, Hindsight) | Platform-Specific (Claude Tandem) | **coding-agent-memory-kit** |
+| | Generic AI Memory (Mem0, MemSearch, Memvid, Hindsight) | Platform-Specific (Claude Tandem) | **Memory as an Artifact** |
 |---|---|---|---|
-| **Memory location** | External DB — opaque, invisible | Local files — but platform-locked | Repo artifacts (git-tracked) + Cosmos DB for sessions |
-| **Human-readable** | No | Partially (MEMORY.md, progress.md) | Yes — structured markdown with project semantics |
-| **Version-controlled** | No | Partially (gitignored progress files) | Fully — artifacts are committed, show up in PRs |
-| **Portable across agents** | No — tied to the memory system's runtime | No — Claude Code only | Yes — any agent that reads markdown |
-| **Portable across developers** | No — requires access to the memory service | No — single-developer, single-machine | Yes — `git clone` gives full project context |
+| **Memory location** | External DB — opaque, invisible | Local files — platform-locked | Repo artifacts (git-tracked) + cloud for sessions |
+| **Human-readable** | No | Partially | Yes — structured markdown with project semantics |
+| **Version-controlled** | No | Partially (gitignored files) | Fully — committed, reviewable in PRs |
+| **Portable across agents** | No — tied to the memory runtime | No — Claude Code only | Yes — any agent that reads markdown |
+| **Portable across developers** | No — requires memory service access | No — single-developer | Yes — `git clone` gives full project context |
 | **Searchable session history** | Vector search over flat memory | No cloud search | Vector + hybrid search via Cosmos DB |
-| **Derived memory** (summaries, facts, profiles) | Hindsight has "reflect"; others don't | No | Thread summaries, fact extraction, user profiles via Durable Functions |
-| **Designed for** | Generic AI chat recall | Claude Code workflow gaps | Coding projects — decisions, state, failures, architecture |
+| **Derived memory** | Hindsight has "reflect" | No | Summaries, facts, profiles via Durable Functions |
+| **Designed for** | Generic AI chat recall | Claude Code gaps | Coding projects — decisions, state, failures, architecture |
 
-The core differentiator is the combination: **structured project-specific artifacts in git** (not flat memory logs) **+ cloud-backed semantic search** (not just local files) **+ full agent and developer portability** (not locked to any platform).
-
-### The Workflow
+### The Lifecycle
 
 ```
  Developer installs skill in repo
@@ -95,6 +112,8 @@ The core differentiator is the combination: **structured project-specific artifa
    teammate's agent — everything is there.
    Project memory grows with the code.
 ```
+
+---
 
 ## Architecture
 
