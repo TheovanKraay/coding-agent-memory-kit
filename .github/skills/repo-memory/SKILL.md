@@ -1,10 +1,118 @@
 # Repo Memory Skill
 
-> Drop-in persistent memory for coding agents. Markdown files for long-term context, Cosmos DB for session transcripts.
+Persistent cross-session memory for coding agents. Uses [AgentMemoryToolkit](https://github.com/TheovanKraay/AgentMemoryToolkit) as the engine — this skill is a thin CLI wrapper plus markdown conventions.
 
-## You are an agent reading this skill. Follow these instructions.
+## Prerequisites
 
-This skill gives you persistent memory across sessions. You maintain markdown files in the repo root and optionally sync session transcripts to Azure Cosmos DB.
+1. **Azure Cosmos DB account** (NoSQL API) with vector search enabled
+2. **`az login`** completed (uses `DefaultAzureCredential`)
+3. **Environment variables** set:
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `COSMOS_DB_ENDPOINT` | Yes | — | Cosmos DB account URI |
+| `COSMOS_DB_DATABASE` | No | `agent_memory` | Database name |
+| `COSMOS_DB_CONTAINER` | No | `memories` | Container name |
+| `AI_FOUNDRY_ENDPOINT` | No | — | Azure AI Foundry (embeddings) |
+| `EMBEDDING_MODEL` | No | `text-embedding-3-large` | Embedding model |
+| `ADF_ENDPOINT` | No | — | Azure Durable Functions endpoint |
+| `ADF_KEY` | No | — | Durable Functions key |
+
+4. **Install dependencies** (one-time):
+   ```bash
+   bash .github/skills/repo-memory/setup.sh
+   ```
+
+## CLI Reference
+
+All commands go through a single script:
+
+```bash
+CLI=".github/skills/repo-memory/scripts/memory_cli.py"
+```
+
+### init — Set up store & templates
+
+```bash
+python $CLI init
+```
+
+Creates the Cosmos DB database/container (with vector + fulltext indexes, hierarchical partition key) and copies markdown templates (`STATE.md`, `DECISIONS.md`, `AGENTS.md`, `CHANGELOG.md`, `FAILURES.md`) to the repo root if they don't exist.
+
+### add — Store a single memory
+
+```bash
+python $CLI add \
+  --user-id <agent-id> \
+  --thread-id <session-id> \
+  --role agent \
+  --content "Decided to use retry logic for transient failures" \
+  --memory-type turn \
+  --agent-id <agent-id>
+```
+
+Roles: `user`, `agent`, `tool`, `system`
+Memory types: `turn`, `summary`, `fact`, `user_summary`
+
+### sync — Bulk upload turns
+
+Write turns to a JSON file, then sync:
+
+```bash
+cat > /tmp/turns.json << 'EOF'
+[
+  {"user_id": "agent-1", "thread_id": "sess-001", "role": "user", "content": "Fix the auth bug"},
+  {"user_id": "agent-1", "thread_id": "sess-001", "role": "agent", "content": "Found root cause in token refresh"}
+]
+EOF
+python $CLI sync --turns-file /tmp/turns.json
+```
+
+### get-thread — Retrieve thread history
+
+```bash
+python $CLI get-thread --thread-id sess-001 --user-id agent-1 --recent-k 20
+```
+
+### get-memories — Filtered retrieval
+
+```bash
+python $CLI get-memories --user-id agent-1 --memory-type fact --recent-k 10
+```
+
+### search — Vector / hybrid search
+
+```bash
+# Semantic search
+python $CLI search --query "auth decision" --user-id agent-1 --memory-type fact --top-k 5
+
+# Hybrid search (vector + full-text via RRF)
+python $CLI search --query "auth decision" --user-id agent-1 --hybrid
+```
+
+### get-user-summary — Cross-thread profile
+
+```bash
+python $CLI get-user-summary --user-id agent-1
+```
+
+### summarize-thread — Generate summary (Durable Functions)
+
+```bash
+python $CLI summarize-thread --user-id agent-1 --thread-id sess-001 --recent-k 50
+```
+
+### extract-facts — Extract facts (Durable Functions)
+
+```bash
+python $CLI extract-facts --user-id agent-1 --thread-id sess-001 --recent-k 50
+```
+
+### summarize-user — Generate user summary (Durable Functions)
+
+```bash
+python $CLI summarize-user --user-id agent-1 --thread-ids sess-001,sess-002,sess-003
+```
 
 ---
 
@@ -12,238 +120,76 @@ This skill gives you persistent memory across sessions. You maintain markdown fi
 
 ### On Session Start
 
-1. **Check for memory files** in the repo root:
-   - `DECISIONS.md`, `STATE.md`, `CHANGELOG.md`, `FAILURES.md`, `AGENTS.md`
-   - If any are missing, create them by running:
-     ```bash
-     python .github/skills/repo-memory/scripts/memory_init.py
-     ```
+1. **Initialise:**
+   ```bash
+   python $CLI init
+   ```
+2. **Read context:** Open `STATE.md` and `DECISIONS.md` for project state.
+3. **Rehydrate from Cosmos (optional):**
+   ```bash
+   python $CLI get-user-summary --user-id <agent-id>
+   python $CLI search --query "<current task description>" --user-id <agent-id> --memory-type fact --top-k 10
+   ```
 
-2. **Read the memory files.** They contain the project's accumulated context — decisions made, current state, past failures, and who's worked on what. Use this to orient yourself.
+### During Session
 
-3. **Check if Cosmos DB is configured** by looking for the `COSMOS_DB_ENDPOINT` environment variable.
-   - If set, rehydrate recent session context:
-     ```bash
-     python .github/skills/repo-memory/scripts/memory_sync.py rehydrate --limit 20
-     ```
-   - This prints recent session summaries from past agents. Use them to understand what happened recently.
-   - If `COSMOS_DB_ENDPOINT` is not set, skip this step. The markdown files alone provide sufficient context.
-
-4. **Generate a session ID** for this session. Use the format: `sess-<8 random hex chars>` (e.g., `sess-a1b2c3d4`).
-
-### During the Session
-
-As you work, **update the markdown files in real time:**
-
-- **DECISIONS.md** — When you make or discover an architectural/design decision, add an entry:
-  ```markdown
-  ### [Short Title]
-  - **Date:** YYYY-MM-DD
-  - **Context:** Why this decision came up
-  - **Decision:** What was decided
-  - **Consequences:** What follows from this
-  ```
-
-- **STATE.md** — Update the project state as things change:
-  - Move items between `## In Progress`, `## Blocked`, `## Done`
-  - Add new items as they emerge
-
-- **CHANGELOG.md** — Log what you changed:
-  ```markdown
-  ### YYYY-MM-DD — [Agent Name]
-  - What changed and why
-  ```
-
-- **FAILURES.md** — When something goes wrong, document it:
-  ```markdown
-  ### [What Failed]
-  - **Date:** YYYY-MM-DD
-  - **What happened:** Description
-  - **Root cause:** Why it failed
-  - **Lesson:** What to do differently
-  ```
-
-- **AGENTS.md** — If you're a new agent working on this repo, add yourself to the agents list.
-
-**If Cosmos DB is configured**, periodically sync your session turns. Write your recent turns to a JSON file and sync:
-
-```bash
-# Write turns to a temp file (array of {role, content, timestamp} objects)
-cat > /tmp/session_turns.json << 'EOF'
-[
-  {"role": "user", "content": "...", "timestamp": "2024-01-15T10:30:00Z"},
-  {"role": "assistant", "content": "...", "timestamp": "2024-01-15T10:30:15Z"}
-]
-EOF
-
-python .github/skills/repo-memory/scripts/memory_sync.py sync \
-  --session-id sess-a1b2c3d4 \
-  --turns-file /tmp/session_turns.json
-```
-
-Do this every 10-15 turns or when you've made significant progress. It's not critical — if you miss a sync, the markdown files still capture the important decisions.
+- **Log decisions** → append to `DECISIONS.md`
+- **Log state changes** → update `STATE.md`
+- **Log failures** → append to `FAILURES.md`
+- **Store turns** individually or batch via `sync`
 
 ### On Session End
 
-1. **Final sync to Cosmos DB** (if configured):
+1. **Generate thread summary:**
    ```bash
-   python .github/skills/repo-memory/scripts/memory_sync.py sync \
-     --session-id sess-a1b2c3d4 \
-     --turns-file /tmp/session_turns.json
+   python $CLI summarize-thread --user-id <agent-id> --thread-id <session-id>
    ```
-
-2. **Add a session reference** to each markdown file you modified. Append a row to the `## Session References` table at the bottom:
-   ```
-   | sess-a1b2c3d4 | codex | 2024-01-15 | thread_id: <from sync output> |
-   ```
-
-3. **Commit the markdown changes:**
+2. **Extract facts:**
    ```bash
-   git add DECISIONS.md STATE.md CHANGELOG.md FAILURES.md AGENTS.md
-   git commit -m "memory: update from session sess-a1b2c3d4"
+   python $CLI extract-facts --user-id <agent-id> --thread-id <session-id>
+   ```
+3. **Update user summary:**
+   ```bash
+   python $CLI summarize-user --user-id <agent-id>
+   ```
+4. **Update markdown files** — add a row to the `## Session References` table in each changed file:
+   ```markdown
+   | 2024-12-20 | sess-001 | agent-1 | Fixed auth token refresh bug |
+   ```
+5. **Commit markdown changes:**
+   ```bash
+   git add STATE.md DECISIONS.md CHANGELOG.md FAILURES.md AGENTS.md
+   git commit -m "session sess-001: <summary>"
    ```
 
----
-
-## Searching Past Context
-
-If you need to find something specific from past sessions:
+### Searching Previous Sessions
 
 ```bash
-python .github/skills/repo-memory/scripts/memory_sync.py search \
-  --query "what was decided about authentication"
+# Semantic search across all facts
+python $CLI search --query "what was the auth decision" --user-id <agent-id> --memory-type fact
+
+# Hybrid search
+python $CLI search --query "retry logic" --user-id <agent-id> --hybrid
+
+# Full thread replay
+python $CLI get-thread --thread-id sess-001
 ```
 
-This performs a semantic search across all stored session transcripts in Cosmos DB and returns relevant excerpts.
+## Markdown Files
 
----
+Each markdown file in the repo root serves as human-readable, git-tracked memory. Chat content is **never** stored in these files — only summaries, decisions, and references to Cosmos DB threads.
 
-## Key Principles
+Every file ends with a `## Session References` table linking to thread IDs stored in Cosmos DB.
 
-1. **Markdown files ARE the memory.** They're human-readable, git-tracked, and the source of truth for project decisions and state. Always keep them updated.
+## Architecture
 
-2. **Cosmos DB is optional but powerful.** It stores full session transcripts for search and cross-agent access. The repo never contains chat history — only pointers in the Session References tables.
-
-3. **You don't need to understand the scripts.** Just call them as documented above. They handle Cosmos DB interactions, auth, indexing, and search.
-
-4. **Auth is Entra ID.** The scripts use `DefaultAzureCredential`. The developer has already authenticated via `az login` or managed identity. Never ask for or store connection strings or keys.
-
-5. **Be a good citizen.** Other agents (and humans) read these markdown files. Write clearly. Be concise. Future you will thank past you.
-
----
-
-## Script Reference
-
-All scripts are in `.github/skills/repo-memory/scripts/`.
-
-| Command | What it does |
-|---------|-------------|
-| `python scripts/memory_init.py` | First-time setup: creates Cosmos DB database/container, creates markdown templates |
-| `python scripts/memory_sync.py init` | Create/verify Cosmos DB resources |
-| `python scripts/memory_sync.py sync --session-id ID --turns-file PATH` | Upload session turns to Cosmos DB |
-| `python scripts/memory_sync.py rehydrate --limit N` | Get recent session context (default: 20 turns) |
-| `python scripts/memory_sync.py search --query "..."` | Semantic search across all sessions |
-
----
-
-## File Templates
-
-If you need to recreate any memory file, use these templates:
-
-<details>
-<summary>AGENTS.md</summary>
-
-```markdown
-# Agents
-
-Who works on this repo — humans and AI agents.
-
-## Humans
-
-| Name | Role | Notes |
-|------|------|-------|
-| | | |
-
-## AI Agents
-
-| Agent | Platform | First Session | Notes |
-|-------|----------|--------------|-------|
-| | | | |
-
-## Session References
-
-| Session ID | Agent | Date | Cosmos DB Thread |
-|------------|-------|------|-----------------|
+```
+┌─────────────────┐     ┌──────────────┐     ┌────────────────────┐     ┌──────────────┐
+│  Repo Markdown  │◄───►│  memory_cli  │◄───►│ AgentMemoryToolkit │◄───►│  Cosmos DB   │
+│  (STATE.md etc) │     │  (this CLI)  │     │ CosmosMemoryClient │     │ + AI Foundry │
+└─────────────────┘     └──────────────┘     └────────────────────┘     └──────────────┘
 ```
 
-</details>
-
-<details>
-<summary>STATE.md</summary>
-
-```markdown
-# Project State
-
-## In Progress
-
--
-
-## Blocked
-
--
-
-## Done
-
--
-
-## Session References
-
-| Session ID | Agent | Date | Cosmos DB Thread |
-|------------|-------|------|-----------------|
-```
-
-</details>
-
-<details>
-<summary>DECISIONS.md</summary>
-
-```markdown
-# Decisions
-
-Architecture Decision Records for this project.
-
-## Session References
-
-| Session ID | Agent | Date | Cosmos DB Thread |
-|------------|-------|------|-----------------|
-```
-
-</details>
-
-<details>
-<summary>CHANGELOG.md</summary>
-
-```markdown
-# Changelog
-
-## Session References
-
-| Session ID | Agent | Date | Cosmos DB Thread |
-|------------|-------|------|-----------------|
-```
-
-</details>
-
-<details>
-<summary>FAILURES.md</summary>
-
-```markdown
-# Failures & Lessons Learned
-
-## Session References
-
-| Session ID | Agent | Date | Cosmos DB Thread |
-|------------|-------|------|-----------------|
-```
-
-</details>
+Markdown = portable, human-readable, git-tracked.
+Cosmos DB = searchable, scalable, vector-indexed.
+The CLI bridges both worlds.

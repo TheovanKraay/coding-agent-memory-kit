@@ -1,11 +1,4 @@
 #!/bin/bash
 set -e
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-echo "Installing dependencies..."
-pip install -r "$SCRIPT_DIR/requirements.txt"
-
-echo ""
-echo "Running initialization..."
-python "$SCRIPT_DIR/scripts/memory_init.py"
+pip install -r "$(dirname "$0")/requirements.txt"
+python "$(dirname "$0")/scripts/memory_cli.py" init

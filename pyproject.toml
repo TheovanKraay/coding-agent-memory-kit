@@ -1,10 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
 [project]
 name = "coding-agent-memory-kit"
-version = "1.0.0"
-description = "Drop-in agent skill for persistent repo memory backed by Azure Cosmos DB"
+version = "3.0.0"
+description = "Drop-in GitHub Skill giving any coding agent persistent memory via AgentMemoryToolkit + Cosmos DB"
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.9"
-authors = [
-    {name = "Theo van Kraay"}
+requires-python = ">=3.10"
+dependencies = [
+    "agent-memory-toolkit @ git+https://github.com/TheovanKraay/AgentMemoryToolkit.git",
+    "azure-identity>=1.17",
 ]
