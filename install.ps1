@@ -145,7 +145,6 @@ if (Test-Path $venvActivate) {
 }
 
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
-$VenvPip = Join-Path $VenvDir "Scripts\pip.exe"
 
 if (-not (Test-Path $VenvPython)) { throw "Venv python not found at $VenvPython" }
 Write-Ok "Virtual environment ready ($VenvPython)"
@@ -153,8 +152,8 @@ Write-Ok "Virtual environment ready ($VenvPython)"
 # ── 4. Install Python dependencies ──────────────────────────────────────────
 Write-Header "Installing Python dependencies"
 
-& $VenvPip install --upgrade pip --quiet 2>$null
-& $VenvPip install "agent-memory-toolkit @ git+https://github.com/TheovanKraay/AgentMemoryToolkit.git" "azure-identity>=1.17" --quiet
+& $VenvPython -m pip install --upgrade pip --quiet 2>$null
+& $VenvPython -m pip install "agent-memory-toolkit @ git+https://github.com/TheovanKraay/AgentMemoryToolkit.git" "azure-identity>=1.17" --quiet
 if ($LASTEXITCODE -ne 0) { throw "Failed to install Python dependencies. Make sure git is installed (required for git+https:// packages)." }
 Write-Ok "Installed agent-memory-toolkit and azure-identity"
 
