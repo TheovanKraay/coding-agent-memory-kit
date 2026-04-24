@@ -21,9 +21,9 @@ $ErrorActionPreference = "Stop"
 
 # ── Globals ──────────────────────────────────────────────────────────────────
 $RepoUrl   = "https://raw.githubusercontent.com/TheovanKraay/coding-agent-memory-kit/main"
-$WorkDir   = (Get-Location).Path
-$SkillDir  = Join-Path $WorkDir ".github\skills\repo-memory"
-$VenvDir   = Join-Path $SkillDir ".venv"
+$WorkDir   = [System.IO.Path]::GetFullPath(".")
+$SkillDir  = [System.IO.Path]::GetFullPath(".github\skills\repo-memory")
+$VenvDir   = [System.IO.Path]::GetFullPath(".github\skills\repo-memory\.venv")
 
 $CreatedTemplates = @()
 $SkippedTemplates = @()
@@ -148,13 +148,14 @@ if (Test-Path $venvActivate) {
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
 
 if (-not (Test-Path $VenvPython)) { throw "Venv python not found at $VenvPython" }
-Write-Ok "Virtual environment ready ($VenvPython)"
+Write-Info "Venv Python path: $VenvPython"
+Write-Ok "Virtual environment ready"
 
 # ── 4. Install Python dependencies ──────────────────────────────────────────
 Write-Header "Installing Python dependencies"
 
-& $VenvPython -m pip install --upgrade pip --quiet 2>$null
-& $VenvPython -m pip install "agent-memory-toolkit @ git+https://github.com/TheovanKraay/AgentMemoryToolkit.git" "azure-identity>=1.17" --quiet
+& "$VenvPython" -m pip install --upgrade pip --quiet 2>$null
+& "$VenvPython" -m pip install "agent-memory-toolkit @ git+https://github.com/TheovanKraay/AgentMemoryToolkit.git" "azure-identity>=1.17" --quiet
 if ($LASTEXITCODE -ne 0) { throw "Failed to install Python dependencies. Make sure git is installed (required for git+https:// packages)." }
 Write-Ok "Installed agent-memory-toolkit and azure-identity"
 
@@ -178,7 +179,7 @@ $SkillFiles = @(
 
 foreach ($file in $SkillFiles) {
     $relativePath = $file -replace "/", "\"
-    $localPath = Join-Path $WorkDir $relativePath
+    $localPath = [System.IO.Path]::GetFullPath($relativePath)
     $dir = Split-Path $localPath -Parent
     if ($dir) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
 
@@ -261,7 +262,7 @@ if ($CosmosOk -and -not $SkipCosmos) {
     if (Confirm-Action "Run 'memory_cli.py init' to set up Cosmos DB?") {
         Write-Info "Initializing Cosmos DB..."
         try {
-            & $VenvPython (Join-Path $SkillDir "scripts\memory_cli.py") init
+            & "$VenvPython" (Join-Path $SkillDir "scripts\memory_cli.py") init
             if ($LASTEXITCODE -ne 0) { throw "init returned non-zero exit code" }
             Write-Ok "Cosmos DB initialized"
         } catch {
