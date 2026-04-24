@@ -39,16 +39,30 @@ Powers async pipelines for thread summarization, fact extraction, and user profi
 
 **1. Set up Azure** (see [Prerequisites](#prerequisites) above):
 
+**Bash / macOS / Linux / WSL:**
 ```bash
 az login
 export COSMOS_DB_ENDPOINT="https://your-account.documents.azure.com:443/"
 export AI_FOUNDRY_ENDPOINT="https://your-foundry.cognitiveservices.azure.com/"
 ```
 
+**PowerShell (Windows):**
+```powershell
+az login
+$env:COSMOS_DB_ENDPOINT = "https://your-account.documents.azure.com:443/"
+$env:AI_FOUNDRY_ENDPOINT = "https://your-foundry.cognitiveservices.azure.com/"
+```
+
 **2. Install** — from the root of any repo:
 
+**Bash / macOS / Linux / WSL:**
 ```bash
 curl -sL https://raw.githubusercontent.com/TheovanKraay/coding-agent-memory-kit/main/install.sh | bash
+```
+
+**PowerShell (Windows):**
+```powershell
+irm https://raw.githubusercontent.com/TheovanKraay/coding-agent-memory-kit/main/install.ps1 | iex
 ```
 
 **That's it.** The installer handles everything: Python, dependencies, skill files, Cosmos DB setup.
