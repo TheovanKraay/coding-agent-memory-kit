@@ -21,7 +21,8 @@ $ErrorActionPreference = "Stop"
 
 # ── Globals ──────────────────────────────────────────────────────────────────
 $RepoUrl   = "https://raw.githubusercontent.com/TheovanKraay/coding-agent-memory-kit/main"
-$SkillDir  = Join-Path $PWD ".github\skills\repo-memory"
+$WorkDir   = (Get-Location).Path
+$SkillDir  = Join-Path $WorkDir ".github\skills\repo-memory"
 $VenvDir   = Join-Path $SkillDir ".venv"
 
 $CreatedTemplates = @()
@@ -177,7 +178,7 @@ $SkillFiles = @(
 
 foreach ($file in $SkillFiles) {
     $relativePath = $file -replace "/", "\"
-    $localPath = Join-Path $PWD $relativePath
+    $localPath = Join-Path $WorkDir $relativePath
     $dir = Split-Path $localPath -Parent
     if ($dir) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
 
