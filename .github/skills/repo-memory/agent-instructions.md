@@ -5,19 +5,16 @@ This repo has a persistent memory skill at `.github/skills/repo-memory/SKILL.md`
 ## Quick Start
 
 **At session start** — load previous context:
-```
-.github/skills/repo-memory/memory session-import
-```
+- **Bash/macOS/Linux:** `.github/skills/repo-memory/memory session-import`
+- **PowerShell/Windows:** `.github\skills\repo-memory\memory.ps1 session-import`
 
 **At session end** — save this session's context:
-```
-.github/skills/repo-memory/memory session-export
-```
+- **Bash/macOS/Linux:** `.github/skills/repo-memory/memory session-export`
+- **PowerShell/Windows:** `.github\skills\repo-memory\memory.ps1 session-export`
 
 **Search past context:**
-```
-.github/skills/repo-memory/memory search --query "..." --user-id <agent-id>
-```
+- **Bash/macOS/Linux:** `.github/skills/repo-memory/memory search --query "..." --user-id <agent-id>`
+- **PowerShell/Windows:** `.github\skills\repo-memory\memory.ps1 search --query "..." --user-id <agent-id>`
 
 ## Keep Artifacts Updated
 
