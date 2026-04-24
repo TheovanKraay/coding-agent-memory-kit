@@ -248,7 +248,7 @@ done
 header "Updating .gitignore"
 
 touch .gitignore
-GITIGNORE_ENTRIES=(".github/skills/repo-memory/.venv/" "__pycache__/")
+GITIGNORE_ENTRIES=(".github/skills/repo-memory/" "__pycache__/")
 for entry in "${GITIGNORE_ENTRIES[@]}"; do
   if ! grep -qF "$entry" .gitignore; then
     echo "$entry" >> .gitignore

@@ -241,7 +241,10 @@ Write-Header "Updating .gitignore"
 
 if (-not (Test-Path .gitignore)) { New-Item -ItemType File -Path .gitignore | Out-Null }
 
-$gitignoreEntries = @(".github/skills/repo-memory/.venv/", "__pycache__/")
+$gitignoreEntries = @(
+    ".github/skills/repo-memory/",
+    "__pycache__/"
+)
 $gitignoreContent = Get-Content .gitignore -Raw -ErrorAction SilentlyContinue
 
 foreach ($entry in $gitignoreEntries) {
