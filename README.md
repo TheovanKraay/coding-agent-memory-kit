@@ -169,7 +169,23 @@ Powers async pipelines for thread summarization, fact extraction, and user profi
 
 ## Quick Start
 
-1. **Authenticate with Azure:**
+### Install
+
+Run this from the root of any repo you want to add memory to:
+
+```bash
+curl -sL https://raw.githubusercontent.com/TheovanKraay/coding-agent-memory-kit/main/install.sh | bash
+```
+
+The installer handles everything: Python check, virtual environment, dependencies, skill files, and markdown templates. Pass `--yes` to skip prompts (for CI), or `--skip-cosmos` to skip Cosmos DB initialization:
+
+```bash
+curl -sL https://raw.githubusercontent.com/TheovanKraay/coding-agent-memory-kit/main/install.sh | bash -s -- --yes
+```
+
+### Configure Azure
+
+1. **Authenticate:**
    ```bash
    az login
    ```
@@ -188,21 +204,23 @@ Powers async pipelines for thread summarization, fact extraction, and user profi
    export EMBEDDING_MODEL="text-embedding-3-large"
    ```
 
-3. **Install & initialise:**
+3. **Initialize Cosmos DB** (if not done during install):
    ```bash
-   bash .github/skills/repo-memory/setup.sh
+   .github/skills/repo-memory/memory init
    ```
+
+### Use it
 
 4. **Store a memory:**
    ```bash
-   python .github/skills/repo-memory/scripts/memory_cli.py add \
+   .github/skills/repo-memory/memory add \
      --user-id agent-1 --thread-id sess-001 --role agent \
      --content "Decided to use retry logic"
    ```
 
 5. **Search memories:**
    ```bash
-   python .github/skills/repo-memory/scripts/memory_cli.py search \
+   .github/skills/repo-memory/memory search \
      --query "retry logic" --user-id agent-1 --hybrid
    ```
 

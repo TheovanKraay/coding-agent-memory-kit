@@ -18,10 +18,11 @@ Persistent cross-session memory for coding agents. Uses [AgentMemoryToolkit](htt
 | `ADF_ENDPOINT` | No | — | Azure Durable Functions endpoint |
 | `ADF_KEY` | No | — | Durable Functions key |
 
-4. **Install dependencies** (one-time):
+4. **Install** (one-time) — run from your repo root:
    ```bash
-   bash .github/skills/repo-memory/setup.sh
+   curl -sL https://raw.githubusercontent.com/TheovanKraay/coding-agent-memory-kit/main/install.sh | bash
    ```
+   This installs the skill, venv, dependencies, and templates. Or use the local `setup.sh` for development of this repo itself.
 
 ## CLI Reference
 
