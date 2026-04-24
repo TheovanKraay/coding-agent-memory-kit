@@ -1,8 +1,22 @@
 # Session Sync Architecture
 
+## Conversations as Code Artifacts
+
+In agentic development, the conversation **is** the code.
+
+When a developer pair-programs with an AI agent, the dialogue — the reasoning, the architectural debates, the "try this approach, no go back" — is as valuable as the code it produces. The code is reproducible from the conversation, but the conversation is not reproducible from the code. The intent, the rejected alternatives, the constraints that shaped decisions: all of that lives in the session transcript.
+
+Traditional version control tracks **what changed** (diffs). This system treats the **why and how** — the conversation that drove those changes — as a first-class versioned artifact. An agent session that produces a feature is as important as the feature's pull request, because it contains the full reasoning chain that led to every design choice.
+
+This is the fundamental shift: platforms like GitHub Copilot's memory or Cursor's context treat agent interactions as a convenience feature — ephemeral, local, disposable. This skill treats every agent conversation as **source material** — durable, searchable, portable across machines, and syncable across platforms. The conversation thread is an artifact of the development process, stored alongside the code with the same rigor.
+
+Tools like GitHub's Copilot Spec Kit and OpenAI's OpenSpec are moving in this direction, providing structured memories and project context. But they stop short of treating the raw conversation itself as the primary artifact. This system goes further: every turn, every tool call, every decision point is persisted in Cosmos DB, vector-indexed for semantic search, and portable across any platform that has an adapter.
+
+The implication is simple: if the conversation that built a feature is lost, you've lost more than chat history — you've lost the most detailed record of *why* the code is the way it is.
+
 ## Problem Statement
 
-Coding agents (Claude Code, GitHub Copilot, Cursor, OpenAI Codex) maintain conversation state locally on whatever machine they run on. When a developer switches machines — laptop to desktop, local to VPS, or CI — the agent starts from scratch. There's no way to resume a session started on machine A from machine B.
+Coding agents (Claude Code, GitHub Copilot, Cursor, OpenAI Codex, OpenClaw) maintain conversation state locally on whatever machine they run on. When a developer switches machines — laptop to desktop, local to VPS, or CI — the agent starts from scratch. There's no way to resume a session started on machine A from machine B.
 
 Session sync solves this by exporting platform-specific session state into Cosmos DB and importing it back on another machine, enabling true cross-machine agent continuity.
 

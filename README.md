@@ -21,6 +21,14 @@ Today, every AI memory system stores memories *outside* the project — in vecto
 
 Raw session transcripts don't belong in the repo — they're noisy and large. Instead, the repo stores **structured distillations** (decisions, state, failures, lessons) and **pointers** to searchable session history in the cloud.
 
+### The Conversation Is the Code
+
+In agentic development, the conversation with the agent **is** the development process. The dialogue — the reasoning, the architectural debates, the "try this approach, no go back" — is as valuable as the code it produces. The code is reproducible from the conversation, but the conversation is not reproducible from the code.
+
+Traditional version control tracks *what changed* (diffs). This system also captures *why and how* — the full reasoning chain that led to every design choice. An agent session that produces a feature is as important as the feature's pull request.
+
+Platforms like GitHub Copilot's memory or Cursor's context treat agent interactions as ephemeral. **Memory as an Artifact** treats every conversation as source material — durable, searchable, portable across machines, and syncable across platforms via [Session Sync](docs/session-sync-architecture.md).
+
 ### The Artifact Files
 
 | File | Purpose | Why it matters |
