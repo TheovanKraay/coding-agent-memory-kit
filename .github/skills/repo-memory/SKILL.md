@@ -198,7 +198,7 @@ The CLI bridges both worlds.
 
 ## Session Sync
 
-Sync coding agent session state (conversation history) across machines via Cosmos DB. Supports Claude Code, GitHub Copilot, Cursor, and OpenAI Codex (best-effort).
+Sync coding agent session state (conversation history) across machines via Cosmos DB. Supports OpenClaw, Claude Code, GitHub Copilot, Cursor, and OpenAI Codex (best-effort).
 
 Sessions are stored as **individual turn documents** in Cosmos DB, with one metadata document per session. All documents share a `cosmos_session_id` partition key, enabling efficient full-session reads and granular search.
 
@@ -287,6 +287,7 @@ Reports: detected, sessions found, read/write status.
 
 | Platform | Fragility | Resume Support | Notes |
 |----------|-----------|----------------|-------|
+| OpenClaw | Low | Auto (session list) | JSONL files, first in detection order |
 | Claude Code | Low | `claude --resume <id>` | JSON files, cleanest integration |
 | GitHub Copilot | High | Open VS Code | Reverse-engineered SQLite |
 | Cursor | High | Open Cursor | VS Code fork, similar to Copilot |

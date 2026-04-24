@@ -14,6 +14,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Optional
 from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone
 
@@ -29,6 +30,7 @@ from session_sync.claude_code import ClaudeCodeAdapter
 from session_sync.copilot import CopilotAdapter
 from session_sync.cursor import CursorAdapter
 from session_sync.codex import CodexAdapter
+from session_sync.openclaw import OpenClawAdapter
 from session_sync.store import SessionStore
 
 
@@ -131,6 +133,7 @@ class MockCosmosClient:
 class TestAdapterRegistry(unittest.TestCase):
     def test_list_adapters(self):
         adapters = list_adapters()
+        self.assertIn("openclaw", adapters)
         self.assertIn("claude-code", adapters)
         self.assertIn("copilot", adapters)
         self.assertIn("cursor", adapters)
@@ -146,7 +149,8 @@ class TestAdapterRegistry(unittest.TestCase):
 
     def test_auto_detect_no_platforms(self):
         """Auto-detect raises when no platform is installed."""
-        with patch.object(ClaudeCodeAdapter, "detect", return_value=False), \
+        with patch.object(OpenClawAdapter, "detect", return_value=False), \
+             patch.object(ClaudeCodeAdapter, "detect", return_value=False), \
              patch.object(CopilotAdapter, "detect", return_value=False), \
              patch.object(CursorAdapter, "detect", return_value=False), \
              patch.object(CodexAdapter, "detect", return_value=False):
@@ -633,6 +637,230 @@ class TestPlatformIdTracking(unittest.TestCase):
         pids = session["metadata"].get("platform_ids", {})
         self.assertEqual(pids.get("claude-code"), "cc-1")
         self.assertEqual(pids.get("copilot"), "cop-1")
+
+
+# ---------------------------------------------------------------------------
+# OpenClaw Adapter Tests
+# ---------------------------------------------------------------------------
+
+def make_openclaw_session(sessions_dir: Path, session_id: str = "test-oc-sess",
+                          cwd: str = "/tmp/project",
+                          extra_lines: Optional[list] = None) -> Path:
+    """Create a synthetic OpenClaw JSONL session file."""
+    sessions_dir.mkdir(parents=True, exist_ok=True)
+    lines = [
+        {"type": "session", "id": "hdr1", "parentId": None,
+         "timestamp": "2025-01-15T10:00:00Z", "sessionId": session_id,
+         "version": 3, "cwd": cwd, "model": "claude-sonnet-4-20250514"},
+        {"type": "model_change", "id": "mc1", "parentId": "hdr1",
+         "timestamp": "2025-01-15T10:00:01Z", "model": "claude-sonnet-4-20250514"},
+        {"type": "custom:openclaw:bootstrap-context:full", "id": "bc1",
+         "parentId": "mc1", "timestamp": "2025-01-15T10:00:02Z",
+         "customType": "custom:openclaw:bootstrap-context:full",
+         "content": "SYSTEM PROMPT SHOULD BE FILTERED"},
+        {"type": "message", "id": "m1", "parentId": "bc1",
+         "timestamp": "2025-01-15T10:01:00Z",
+         "message": {"role": "user",
+                     "content": [{"type": "text", "text": "Fix the auth bug"}]}},
+        {"type": "message", "id": "m2", "parentId": "m1",
+         "timestamp": "2025-01-15T10:02:00Z",
+         "message": {"role": "assistant",
+                     "content": [{"type": "text", "text": "Found the issue in token refresh."}]}},
+        {"type": "compaction", "id": "cp1", "parentId": "m2",
+         "timestamp": "2025-01-15T10:03:00Z"},
+        {"type": "message", "id": "m3", "parentId": "cp1",
+         "timestamp": "2025-01-15T10:04:00Z",
+         "message": {"role": "user",
+                     "content": [{"type": "text", "text": "Great, apply the fix."}]}},
+        {"type": "message", "id": "m4", "parentId": "m3",
+         "timestamp": "2025-01-15T10:05:00Z",
+         "message": {"role": "assistant",
+                     "content": [{"type": "text", "text": "Done. Token refreshes correctly now."}]}},
+    ]
+    if extra_lines:
+        lines.extend(extra_lines)
+
+    path = sessions_dir / f"{session_id}.jsonl"
+    with open(path, "w") as f:
+        for line in lines:
+            f.write(json.dumps(line) + "\n")
+    return path
+
+
+def make_openclaw_index(agent_dir: Path, entries: dict) -> Path:
+    """Create a sessions.json index file."""
+    index_path = agent_dir / "sessions.json"
+    index_path.write_text(json.dumps(entries, indent=2))
+    return index_path
+
+
+class TestOpenClawAdapter(unittest.TestCase):
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp()
+        self.agents_dir = Path(self.tmpdir) / ".openclaw" / "agents"
+        self.agent_dir = self.agents_dir / "testagent"
+        self.sessions_dir = self.agent_dir / "sessions"
+        self.sessions_dir.mkdir(parents=True)
+        self.adapter = OpenClawAdapter(agents_dir=self.agents_dir)
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmpdir)
+
+    def _setup_session(self, session_id="test-oc-sess", cwd="/tmp/project",
+                       extra_lines=None):
+        path = make_openclaw_session(
+            self.sessions_dir, session_id, cwd, extra_lines
+        )
+        make_openclaw_index(self.agent_dir, {
+            f"agent:testagent:test:{session_id}": {
+                "sessionId": session_id,
+                "sessionFile": str(path),
+                "origin": {"provider": "test", "surface": "test"},
+                "updatedAt": 1705312200000,
+            }
+        })
+        return path
+
+    def test_detect(self):
+        self.assertTrue(self.adapter.detect())
+
+    def test_detect_missing(self):
+        adapter = OpenClawAdapter(agents_dir=Path(self.tmpdir) / "nonexistent")
+        self.assertFalse(adapter.detect())
+
+    def test_locate_sessions(self):
+        self._setup_session()
+        sessions = self.adapter.locate_sessions()
+        self.assertEqual(len(sessions), 1)
+        self.assertEqual(sessions[0].id, "test-oc-sess")
+        self.assertEqual(sessions[0].workspace, "/tmp/project")
+        self.assertEqual(sessions[0].summary_hint, "Fix the auth bug")
+
+    def test_locate_sessions_workspace_filter(self):
+        self._setup_session("s1", "/tmp/project")
+        p2 = make_openclaw_session(self.sessions_dir, "s2", "/tmp/other")
+        # Add s2 to index
+        idx = json.loads((self.agent_dir / "sessions.json").read_text())
+        idx["agent:testagent:test:s2"] = {
+            "sessionId": "s2",
+            "sessionFile": str(p2),
+            "origin": {"provider": "test"},
+            "updatedAt": 1705312200000,
+        }
+        (self.agent_dir / "sessions.json").write_text(json.dumps(idx))
+
+        sessions = self.adapter.locate_sessions(workspace="/tmp/project")
+        self.assertEqual(len(sessions), 1)
+        self.assertEqual(sessions[0].id, "s1")
+
+    def test_export_session(self):
+        self._setup_session()
+        data = self.adapter.export_session("test-oc-sess")
+        self.assertIn("metadata", data)
+        self.assertIn("turns", data)
+        self.assertEqual(data["metadata"]["platform"], "openclaw")
+        self.assertEqual(data["metadata"]["platform_session_id"], "test-oc-sess")
+        # Should have 4 message turns (skip session, model_change, bootstrap, compaction)
+        self.assertEqual(len(data["turns"]), 4)
+        self.assertEqual(data["turns"][0]["role"], "user")
+        self.assertEqual(data["turns"][0]["content"], "Fix the auth bug")
+
+    def test_export_filters_bootstrap_and_compaction(self):
+        """Verify bootstrap-context and compaction lines are excluded."""
+        self._setup_session()
+        data = self.adapter.export_session("test-oc-sess")
+        contents = [t["content"] for t in data["turns"]]
+        self.assertNotIn("SYSTEM PROMPT SHOULD BE FILTERED", contents)
+        # Only message type lines should be in turns
+        for turn in data["turns"]:
+            self.assertIn(turn["role"], ("user", "assistant"))
+
+    def test_export_session_not_found(self):
+        with self.assertRaises(FileNotFoundError):
+            self.adapter.export_session("nonexistent")
+
+    def test_import_session(self):
+        self._setup_session()
+        data = self.adapter.export_session("test-oc-sess")
+        new_id = self.adapter.import_session(data)
+        self.assertTrue(new_id)
+        # Verify the JSONL file was created
+        new_file = self.sessions_dir / f"{new_id}.jsonl"
+        self.assertTrue(new_file.exists())
+        # Verify sessions.json was updated
+        idx = json.loads((self.agent_dir / "sessions.json").read_text())
+        self.assertIn(f"imported:{new_id}", idx)
+
+    def test_round_trip(self):
+        """Export -> import -> export should produce equivalent turns."""
+        self._setup_session()
+        original = self.adapter.export_session("test-oc-sess")
+        new_id = self.adapter.import_session(original)
+        reimported = self.adapter.export_session(new_id)
+        self.assertEqual(len(original["turns"]), len(reimported["turns"]))
+        for orig, new in zip(original["turns"], reimported["turns"]):
+            self.assertEqual(orig["role"], new["role"])
+            self.assertEqual(orig["content"], new["content"])
+
+    def test_import_valid_jsonl(self):
+        """Imported JSONL should have valid structure."""
+        self._setup_session()
+        data = self.adapter.export_session("test-oc-sess")
+        new_id = self.adapter.import_session(data)
+        new_file = self.sessions_dir / f"{new_id}.jsonl"
+        lines = []
+        with open(new_file) as f:
+            for raw in f:
+                lines.append(json.loads(raw.strip()))
+        # First line should be session header
+        self.assertEqual(lines[0]["type"], "session")
+        self.assertEqual(lines[0]["version"], 3)
+        # Remaining should be messages with proper parentId chain
+        for i in range(1, len(lines)):
+            self.assertEqual(lines[i]["type"], "message")
+            self.assertEqual(lines[i]["parentId"], lines[i-1]["id"])
+
+    def test_multi_agent_scan(self):
+        """Sessions from multiple agents should all be found."""
+        # Agent 1
+        agent1_sessions = self.sessions_dir
+        p1 = make_openclaw_session(agent1_sessions, "agent1-sess", "/tmp/a")
+        make_openclaw_index(self.agent_dir, {
+            "k1": {"sessionId": "agent1-sess", "sessionFile": str(p1),
+                   "origin": {}, "updatedAt": 1705312200000}
+        })
+        # Agent 2
+        agent2_dir = self.agents_dir / "agent2"
+        agent2_sessions = agent2_dir / "sessions"
+        agent2_sessions.mkdir(parents=True)
+        p2 = make_openclaw_session(agent2_sessions, "agent2-sess", "/tmp/b")
+        make_openclaw_index(agent2_dir, {
+            "k2": {"sessionId": "agent2-sess", "sessionFile": str(p2),
+                   "origin": {}, "updatedAt": 1705312200000}
+        })
+
+        sessions = self.adapter.locate_sessions()
+        ids = {s.id for s in sessions}
+        self.assertIn("agent1-sess", ids)
+        self.assertIn("agent2-sess", ids)
+
+    def test_resume_command(self):
+        cmd = self.adapter.resume_command("some-id")
+        self.assertIn("some-id", cmd)
+        self.assertIn("internally", cmd)
+
+    def test_yield_points_in_metadata(self):
+        """sessions_yield lines should appear in export metadata."""
+        yield_line = {
+            "type": "custom_message:openclaw.sessions_yield",
+            "id": "y1", "parentId": "m4",
+            "timestamp": "2025-01-15T10:06:00Z",
+        }
+        self._setup_session(extra_lines=[yield_line])
+        data = self.adapter.export_session("test-oc-sess")
+        self.assertIn("yield_points", data["metadata"])
+        self.assertEqual(len(data["metadata"]["yield_points"]), 1)
 
 
 if __name__ == "__main__":

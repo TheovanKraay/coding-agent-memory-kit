@@ -19,10 +19,10 @@ Session sync solves this by exporting platform-specific session state into Cosmo
          │              │  SessionAdapter │
          │              └─────────────────┘
          │
-    ┌────┴────────────────────────────────┐
-    │  claude_code.py  │  copilot.py      │
-    │  cursor.py       │  codex.py        │
-    └─────────────────────────────────────┘
+    ┌────┴────────────────────────────────────────────┐
+    │  openclaw.py   │  claude_code.py  │  copilot.py  │
+    │  cursor.py     │  codex.py                       │
+    └──────────────────────────────────────────────────┘
 ```
 
 The system uses a **pluggable adapter pattern**. Each coding agent platform gets its own adapter that knows how to read/write that platform's session files. A common `SessionStore` handles Cosmos DB persistence. The CLI orchestrates everything.
@@ -119,6 +119,19 @@ The `SessionStore` consumes this format and writes individual Cosmos documents. 
 - **Storage:** Sessions live on OpenAI servers. No local files.
 - **Capabilities:** `detect()` checks for codex CLI/config. `export_session()` can store synthetic summaries from markdown artifacts. All other methods raise `NotImplementedError`.
 - **Notes:** Most fragile adapter. Would need API access or scraping to get real session data. Currently a best-effort stub.
+
+### OpenClaw
+
+- **Fragility: LOW** — we control the format
+- **Storage:** `~/.openclaw/agents/<agent-id>/sessions/*.jsonl` with a `sessions.json` index per agent
+- **Format:** JSONL (one JSON object per line), based on the Claude Agent SDK format with additional custom types. Key line types:
+  - `session` — header with version, session ID, cwd, model
+  - `message` — conversation turns with `message.role` and `message.content` (content blocks)
+  - `compaction` — context window compaction markers (filtered on export)
+  - `custom:openclaw:bootstrap-context:full` — injected system prompts (filtered on export)
+  - `custom_message:openclaw.sessions_yield` — subagent orchestration yield points (preserved as metadata)
+- **Resume:** Sessions appear automatically in the agent's session list; no CLI command needed
+- **Notes:** Multiple agents can exist under `~/.openclaw/agents/`. The adapter scans all agent directories. Checkpoint files (`*.checkpoint.*.jsonl`) are ignored in favor of the canonical `.jsonl` file. The adapter is first in detection order since if running inside OpenClaw, it's the most relevant platform.
 
 ## Cosmos DB Storage Model
 

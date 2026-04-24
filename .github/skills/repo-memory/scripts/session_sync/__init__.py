@@ -8,13 +8,16 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from .base import SessionAdapter, SessionInfo  # noqa: F401
+from .openclaw import OpenClawAdapter
 from .claude_code import ClaudeCodeAdapter
 from .copilot import CopilotAdapter
 from .cursor import CursorAdapter
 from .codex import CodexAdapter
 
 # Canonical adapter instances keyed by platform name.
+# OpenClaw is first in detection order — if running inside OpenClaw, prefer it.
 _ADAPTERS: Dict[str, SessionAdapter] = {
+    "openclaw": OpenClawAdapter(),
     "claude-code": ClaudeCodeAdapter(),
     "copilot": CopilotAdapter(),
     "cursor": CursorAdapter(),
