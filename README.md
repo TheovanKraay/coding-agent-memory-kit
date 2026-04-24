@@ -169,60 +169,40 @@ Powers async pipelines for thread summarization, fact extraction, and user profi
 
 ## Quick Start
 
-### Install
+**1. Set up Azure resources** (see [Prerequisites](#prerequisites) above), then set your environment variables:
 
-Run this from the root of any repo you want to add memory to:
+```bash
+az login
+
+export COSMOS_DB_ENDPOINT="https://your-account.documents.azure.com:443/"
+export AI_FOUNDRY_ENDPOINT="https://your-foundry.cognitiveservices.azure.com/"
+```
+
+**2. Install into your repo** — run this from the root of any repo:
 
 ```bash
 curl -sL https://raw.githubusercontent.com/TheovanKraay/coding-agent-memory-kit/main/install.sh | bash
 ```
 
-The installer handles everything: Python check, virtual environment, dependencies, skill files, and markdown templates. Pass `--yes` to skip prompts (for CI), or `--skip-cosmos` to skip Cosmos DB initialization:
+That's it. The installer detects your OS, installs Python if needed, creates an isolated virtual environment, downloads the skill files, copies markdown templates, and initializes Cosmos DB — all in one step.
+
+> **Flags:** Pass `--yes` to skip prompts (for CI). Pass `--skip-cosmos` to install files only without Cosmos DB setup.
+
+**3. Use it:**
 
 ```bash
-curl -sL https://raw.githubusercontent.com/TheovanKraay/coding-agent-memory-kit/main/install.sh | bash -s -- --yes
+# Store a memory
+.github/skills/repo-memory/memory add \
+  --user-id agent-1 --thread-id sess-001 --role agent \
+  --content "Decided to use retry logic"
+
+# Search memories
+.github/skills/repo-memory/memory search \
+  --query "retry logic" --user-id agent-1 --hybrid
+
+# Sync coding agent sessions to Cosmos DB
+.github/skills/repo-memory/memory session-sync
 ```
-
-### Configure Azure
-
-1. **Authenticate:**
-   ```bash
-   az login
-   ```
-
-2. **Set environment variables:**
-   ```bash
-   # Required
-   export COSMOS_DB_ENDPOINT="https://your-account.documents.azure.com:443/"
-
-   # Required for search (see Prerequisites above)
-   export AI_FOUNDRY_ENDPOINT="https://your-foundry.cognitiveservices.azure.com/"
-
-   # Optional — defaults shown
-   export COSMOS_DB_DATABASE="agent_memory"
-   export COSMOS_DB_CONTAINER="memories"
-   export EMBEDDING_MODEL="text-embedding-3-large"
-   ```
-
-3. **Initialize Cosmos DB** (if not done during install):
-   ```bash
-   .github/skills/repo-memory/memory init
-   ```
-
-### Use it
-
-4. **Store a memory:**
-   ```bash
-   .github/skills/repo-memory/memory add \
-     --user-id agent-1 --thread-id sess-001 --role agent \
-     --content "Decided to use retry logic"
-   ```
-
-5. **Search memories:**
-   ```bash
-   .github/skills/repo-memory/memory search \
-     --query "retry logic" --user-id agent-1 --hybrid
-   ```
 
 ## Configuration Reference
 
