@@ -194,7 +194,8 @@ $SkillFiles = @(
     ".github/skills/repo-memory/scripts/session_sync/codex.py",
     ".github/skills/repo-memory/scripts/session_sync/openclaw.py",
     ".github/skills/repo-memory/scripts/session_sync/store.py",
-    ".github/skills/repo-memory/agent-instructions.md"
+    ".github/skills/repo-memory/agent-instructions.md",
+    ".github/skills/repo-memory/.env.template"
 )
 
 foreach ($file in $SkillFiles) {
@@ -243,7 +244,8 @@ if (-not (Test-Path .gitignore)) { New-Item -ItemType File -Path .gitignore | Ou
 
 $gitignoreEntries = @(
     ".github/skills/repo-memory/",
-    "__pycache__/"
+    "__pycache__/",
+    ".env"
 )
 $gitignoreContent = Get-Content .gitignore -Raw -ErrorAction SilentlyContinue
 
@@ -396,6 +398,11 @@ if ($CosmosOk -and $FoundryOk) {
 } else {
     Write-Warn "Azure: not configured (set COSMOS_DB_ENDPOINT and AI_FOUNDRY_ENDPOINT)"
 }
+
+Write-Host ""
+Write-Info "TIP: Copy .env.template to .env and fill in your Azure endpoints."
+Write-Info "This avoids env var issues in VS Code terminals."
+Write-Info "  cp .github\skills\repo-memory\.env.template .github\skills\repo-memory\.env"
 
 Write-Host ""
 Write-Host "Usage:" -ForegroundColor White

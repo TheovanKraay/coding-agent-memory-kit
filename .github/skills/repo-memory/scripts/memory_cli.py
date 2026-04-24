@@ -12,6 +12,59 @@ import shutil
 import sys
 from pathlib import Path
 
+
+# ---------------------------------------------------------------------------
+# .env file loader (no external dependencies)
+# ---------------------------------------------------------------------------
+
+def _load_dotenv():
+    """Load variables from .env files into os.environ.
+
+    Search order (first found wins per variable):
+      1. .github/skills/repo-memory/.env  (skill-local)
+      2. <repo-root>/.env                 (repo-root)
+
+    Existing env vars are NOT overwritten — real environment always wins.
+    """
+    skill_dir = Path(__file__).resolve().parent.parent  # .github/skills/repo-memory
+    repo_root = skill_dir.parent.parent.parent          # repo root
+
+    candidates = [
+        skill_dir / ".env",
+        repo_root / ".env",
+    ]
+
+    loaded = set()
+    for env_path in candidates:
+        if not env_path.is_file():
+            continue
+        try:
+            with open(env_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if "=" not in line:
+                        continue
+                    key, _, value = line.partition("=")
+                    key = key.strip()
+                    value = value.strip()
+                    # Remove surrounding quotes
+                    if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+                        value = value[1:-1]
+                    # Don't overwrite existing env vars
+                    if key and key not in os.environ and key not in loaded:
+                        os.environ[key] = value
+                        loaded.add(key)
+        except OSError:
+            continue
+
+    if loaded:
+        print(f"  Loaded {len(loaded)} var(s) from .env: {', '.join(sorted(loaded))}", file=sys.stderr)
+
+
+_load_dotenv()
+
 from agent_memory_toolkit import CosmosMemoryClient
 
 # Add scripts dir to path for session_sync imports

@@ -208,6 +208,7 @@ SKILL_FILES=(
   ".github/skills/repo-memory/scripts/session_sync/openclaw.py"
   ".github/skills/repo-memory/scripts/session_sync/store.py"
   ".github/skills/repo-memory/agent-instructions.md"
+  ".github/skills/repo-memory/.env.template"
 )
 
 for file in "${SKILL_FILES[@]}"; do
@@ -248,7 +249,7 @@ done
 header "Updating .gitignore"
 
 touch .gitignore
-GITIGNORE_ENTRIES=(".github/skills/repo-memory/" "__pycache__/")
+GITIGNORE_ENTRIES=(".github/skills/repo-memory/" "__pycache__/" ".env")
 for entry in "${GITIGNORE_ENTRIES[@]}"; do
   if ! grep -qF "$entry" .gitignore; then
     echo "$entry" >> .gitignore
@@ -383,6 +384,11 @@ elif $COSMOS_OK; then
 else
   warn "Azure: not configured (set COSMOS_DB_ENDPOINT and AI_FOUNDRY_ENDPOINT)"
 fi
+
+echo ""
+info "TIP: Copy .env.template to .env and fill in your Azure endpoints."
+info "This avoids env var issues in VS Code terminals."
+info "  cp .github/skills/repo-memory/.env.template .github/skills/repo-memory/.env"
 
 printf "\n${BOLD}Usage:${NC}\n"
 echo "  # Store a memory"
