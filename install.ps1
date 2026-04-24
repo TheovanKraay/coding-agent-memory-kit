@@ -156,7 +156,13 @@ Write-Header "Installing Python dependencies"
 
 # Ensure pip is available in the venv (Windows Python may omit it)
 try { & "$VenvPython" -m ensurepip --upgrade 2>$null } catch { }
-& "$VenvPython" -m pip install --upgrade pip --quiet 2>$null
+# Upgrade pip via get-pip.py to avoid pip 25.x "No module named pip.main" bug
+try {
+    $getPip = Join-Path $VenvDir "get-pip.py"
+    Invoke-RestMethod -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPip
+    & "$VenvPython" $getPip --quiet 2>$null
+    Remove-Item $getPip -ErrorAction SilentlyContinue
+} catch { }
 & "$VenvPython" -m pip install "agent-memory-toolkit @ git+https://github.com/TheovanKraay/AgentMemoryToolkit.git" "azure-identity>=1.17" --quiet
 if ($LASTEXITCODE -ne 0) { throw "Failed to install Python dependencies. Make sure git is installed (required for git+https:// packages)." }
 Write-Ok "Installed agent-memory-toolkit and azure-identity"
