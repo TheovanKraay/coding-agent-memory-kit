@@ -1,12 +1,132 @@
 # Memory as an Artifact
 
-> **Memory as an Artifact** is the principle that an AI coding agent's project memory should be a first-class, version-controlled artifact — committed to the repo, readable by humans and agents alike, and portable everywhere the code goes.
-
-**coding-agent-memory-kit** is the reference implementation of this principle.
+> Give your AI coding agents durable, cross-platform memory. Install into any repo — agent sessions automatically sync to Azure Cosmos DB, searchable and resumable across machines and platforms.
 
 ---
 
-## The Concept
+## Prerequisites
+
+You need two Azure services set up before using this kit:
+
+### 1. Azure Cosmos DB (NoSQL API)
+
+Stores all memories, session turns, facts, and summaries.
+
+- Create a Cosmos DB account with the **NoSQL API**
+- Enable **vector search** on the account (required for semantic search)
+- Authentication uses `DefaultAzureCredential` — run `az login` or configure a service principal
+- The CLI auto-creates the database and container on first `init` (with vector indexes, fulltext indexes, and hierarchical partition key)
+
+### 2. Azure AI Foundry (formerly Azure OpenAI)
+
+Generates vector embeddings for semantic and hybrid search. **Required for any search functionality.**
+
+- Create an [Azure AI Foundry](https://ai.azure.com/) resource (this is the rebranded Azure OpenAI Service)
+- Deploy an embedding model — the default is `text-embedding-3-large` but any embedding model works
+- The endpoint looks like: `https://your-resource.cognitiveservices.azure.com/` or `https://your-resource.openai.azure.com/`
+- Authentication uses `DefaultAzureCredential` (same `az login` as Cosmos DB)
+
+> **Without AI Foundry**, you can store and retrieve memories by ID/thread, but **vector search and hybrid search will not work**. If search is important to you (it probably is), this is effectively required.
+
+### 3. Azure Durable Functions (optional)
+
+Powers async pipelines for thread summarization, fact extraction, and user profile generation. These are convenience features — the core memory and session sync functionality works without them.
+
+---
+
+
+## Quick Start
+
+**1. Set up Azure** (see [Prerequisites](#prerequisites) above):
+
+```bash
+az login
+export COSMOS_DB_ENDPOINT="https://your-account.documents.azure.com:443/"
+export AI_FOUNDRY_ENDPOINT="https://your-foundry.cognitiveservices.azure.com/"
+```
+
+**2. Install** — from the root of any repo:
+
+```bash
+curl -sL https://raw.githubusercontent.com/TheovanKraay/coding-agent-memory-kit/main/install.sh | bash
+```
+
+**That's it.** The installer handles everything: Python, dependencies, skill files, Cosmos DB setup.
+
+### What happens next
+
+Once installed, your coding agent sessions are automatically synced:
+
+- **Session export** — when an agent session ends, its full conversation history is stored in Cosmos DB as individual turn documents, vector-indexed and searchable
+- **Session import** — when a new agent starts (same machine or different), it checks Cosmos DB for previous sessions on this repo and can resume where the last agent left off
+- **Cross-platform** — a session started in Claude Code on your laptop can be resumed in Cursor on your desktop, or picked up by an OpenClaw agent on a VPS
+- **Semantic search** — any agent can search across all past sessions: *"what did we decide about authentication?"*
+
+The skill instructs agents how to do this automatically via [SKILL.md](.github/skills/repo-memory/SKILL.md). You don't need to run commands manually — the agent reads the skill and handles session sync on its own.
+
+### What gets stored
+
+| In your repo (git-tracked) | In Cosmos DB (cloud-synced) |
+|---|---|
+| `STATE.md` — current project state | Full session transcripts (per-turn documents) |
+| `DECISIONS.md` — architectural decisions | Vector embeddings for semantic search |
+| `FAILURES.md` — what went wrong | Session metadata (platform, machine, workspace) |
+| `CHANGELOG.md` — what changed | Extracted facts and thread summaries |
+| `AGENTS.md` — who works on this repo | Cross-session user profiles |
+
+The repo artifacts are human-readable summaries. Cosmos DB holds the full conversation history — the [conversation-as-artifact](docs/session-sync-architecture.md#conversations-as-code-artifacts) that is now the primary record of how and why code was written.
+
+> **Flags:** Pass `--yes` to skip prompts (for CI). Pass `--skip-cosmos` to install files only.
+
+---
+
+
+## CLI Reference
+
+For advanced use or manual operations, the skill includes a CLI:
+
+```bash
+# Sync all local agent sessions to/from Cosmos DB
+.github/skills/repo-memory/memory session-sync
+
+# List sessions (local, cosmos, or both)
+.github/skills/repo-memory/memory session-list --source both
+
+# Search across all past sessions
+.github/skills/repo-memory/memory search --query "auth decision" --user-id agent-1 --hybrid
+
+# Store a memory manually
+.github/skills/repo-memory/memory add \
+  --user-id agent-1 --thread-id sess-001 --role agent \
+  --content "Decided to use retry logic"
+
+# Test which platform adapters work on this machine
+.github/skills/repo-memory/memory session-test
+```
+
+See [SKILL.md](.github/skills/repo-memory/SKILL.md) for the full command reference.
+
+
+## Configuration Reference
+
+| Variable | Required | Default | Purpose |
+|----------|----------|---------|---------|
+| `COSMOS_DB_ENDPOINT` | **Yes** | — | Cosmos DB account URI |
+| `AI_FOUNDRY_ENDPOINT` | **Yes**\* | — | Azure AI Foundry endpoint for embeddings |
+| `COSMOS_DB_DATABASE` | No | `agent_memory` | Database name |
+| `COSMOS_DB_CONTAINER` | No | `memories` | Container name |
+| `EMBEDDING_MODEL` | No | `text-embedding-3-large` | Embedding model deployed in AI Foundry |
+| `ADF_ENDPOINT` | No | — | Azure Durable Functions endpoint (for summaries/facts) |
+| `ADF_KEY` | No | — | Durable Functions key |
+
+\* Required for vector/hybrid search. Without it, only ID-based retrieval works.
+
+
+---
+
+## Concepts
+
+### The Principle
 
 Today, every AI memory system stores memories *outside* the project — in vector databases, proprietary formats, or opaque cloud services. That memory is invisible to humans, locked to a single tool, and lost when you switch agents or machines.
 
@@ -43,7 +163,7 @@ These aren't log files. They're **living project artifacts** with defined struct
 
 ---
 
-## The Problem This Solves
+### The Problem This Solves
 
 AI coding agents have no lasting memory. Every session starts from scratch.
 
@@ -57,7 +177,7 @@ Existing memory solutions store memories in external databases (Milvus, ChromaDB
 
 ---
 
-## How It Works
+### How It Works
 
 **coding-agent-memory-kit** implements Memory as an Artifact with two layers:
 
@@ -123,7 +243,7 @@ The repo stores **pointers** to Cosmos DB sessions (session ID, date, agent, thr
 
 ---
 
-## Architecture
+### Architecture
 
 ```
 ┌─────────────────┐     ┌──────────────┐     ┌────────────────────┐     ┌──────────────┐
@@ -137,126 +257,14 @@ The repo stores **pointers** to Cosmos DB sessions (session ID, date, agent, thr
 - **AgentMemoryToolkit** — handles Cosmos DB CRUD, vector/hybrid search, embeddings, Durable Functions pipelines
 - **Cosmos DB + AI Foundry** — scalable vector-indexed storage and embedding generation
 
-## Prerequisites
-
-You need two Azure services set up before using this kit:
-
-### 1. Azure Cosmos DB (NoSQL API)
-
-Stores all memories, session turns, facts, and summaries.
-
-- Create a Cosmos DB account with the **NoSQL API**
-- Enable **vector search** on the account (required for semantic search)
-- Authentication uses `DefaultAzureCredential` — run `az login` or configure a service principal
-- The CLI auto-creates the database and container on first `init` (with vector indexes, fulltext indexes, and hierarchical partition key)
-
-### 2. Azure AI Foundry (formerly Azure OpenAI)
-
-Generates vector embeddings for semantic and hybrid search. **Required for any search functionality.**
-
-- Create an [Azure AI Foundry](https://ai.azure.com/) resource (this is the rebranded Azure OpenAI Service)
-- Deploy an embedding model — the default is `text-embedding-3-large` but any embedding model works
-- The endpoint looks like: `https://your-resource.cognitiveservices.azure.com/` or `https://your-resource.openai.azure.com/`
-- Authentication uses `DefaultAzureCredential` (same `az login` as Cosmos DB)
-
-> **Without AI Foundry**, you can store and retrieve memories by ID/thread, but **vector search and hybrid search will not work**. If search is important to you (it probably is), this is effectively required.
-
-### 3. Azure Durable Functions (optional)
-
-Powers async pipelines for thread summarization, fact extraction, and user profile generation. These are convenience features — the core memory and session sync functionality works without them.
-
----
-
-## Quick Start
-
-**1. Set up Azure** (see [Prerequisites](#prerequisites) above):
-
-```bash
-az login
-export COSMOS_DB_ENDPOINT="https://your-account.documents.azure.com:443/"
-export AI_FOUNDRY_ENDPOINT="https://your-foundry.cognitiveservices.azure.com/"
-```
-
-**2. Install** — from the root of any repo:
-
-```bash
-curl -sL https://raw.githubusercontent.com/TheovanKraay/coding-agent-memory-kit/main/install.sh | bash
-```
-
-**That's it.** The installer handles everything: Python, dependencies, skill files, Cosmos DB setup.
-
-### What happens next
-
-Once installed, your coding agent sessions are automatically synced:
-
-- **Session export** — when an agent session ends, its full conversation history is stored in Cosmos DB as individual turn documents, vector-indexed and searchable
-- **Session import** — when a new agent starts (same machine or different), it checks Cosmos DB for previous sessions on this repo and can resume where the last agent left off
-- **Cross-platform** — a session started in Claude Code on your laptop can be resumed in Cursor on your desktop, or picked up by an OpenClaw agent on a VPS
-- **Semantic search** — any agent can search across all past sessions: *"what did we decide about authentication?"*
-
-The skill instructs agents how to do this automatically via [SKILL.md](.github/skills/repo-memory/SKILL.md). You don't need to run commands manually — the agent reads the skill and handles session sync on its own.
-
-### What gets stored
-
-| In your repo (git-tracked) | In Cosmos DB (cloud-synced) |
-|---|---|
-| `STATE.md` — current project state | Full session transcripts (per-turn documents) |
-| `DECISIONS.md` — architectural decisions | Vector embeddings for semantic search |
-| `FAILURES.md` — what went wrong | Session metadata (platform, machine, workspace) |
-| `CHANGELOG.md` — what changed | Extracted facts and thread summaries |
-| `AGENTS.md` — who works on this repo | Cross-session user profiles |
-
-The repo artifacts are human-readable summaries. Cosmos DB holds the full conversation history — the [conversation-as-artifact](docs/session-sync-architecture.md#conversations-as-code-artifacts) that is now the primary record of how and why code was written.
-
-> **Flags:** Pass `--yes` to skip prompts (for CI). Pass `--skip-cosmos` to install files only.
-
----
-
-## CLI Reference
-
-For advanced use or manual operations, the skill includes a CLI:
-
-```bash
-# Sync all local agent sessions to/from Cosmos DB
-.github/skills/repo-memory/memory session-sync
-
-# List sessions (local, cosmos, or both)
-.github/skills/repo-memory/memory session-list --source both
-
-# Search across all past sessions
-.github/skills/repo-memory/memory search --query "auth decision" --user-id agent-1 --hybrid
-
-# Store a memory manually
-.github/skills/repo-memory/memory add \
-  --user-id agent-1 --thread-id sess-001 --role agent \
-  --content "Decided to use retry logic"
-
-# Test which platform adapters work on this machine
-.github/skills/repo-memory/memory session-test
-```
-
-See [SKILL.md](.github/skills/repo-memory/SKILL.md) for the full command reference.
-
-## Configuration Reference
-
-| Variable | Required | Default | Purpose |
-|----------|----------|---------|---------|
-| `COSMOS_DB_ENDPOINT` | **Yes** | — | Cosmos DB account URI |
-| `AI_FOUNDRY_ENDPOINT` | **Yes**\* | — | Azure AI Foundry endpoint for embeddings |
-| `COSMOS_DB_DATABASE` | No | `agent_memory` | Database name |
-| `COSMOS_DB_CONTAINER` | No | `memories` | Container name |
-| `EMBEDDING_MODEL` | No | `text-embedding-3-large` | Embedding model deployed in AI Foundry |
-| `ADF_ENDPOINT` | No | — | Azure Durable Functions endpoint (for summaries/facts) |
-| `ADF_KEY` | No | — | Durable Functions key |
-
-\* Required for vector/hybrid search. Without it, only ID-based retrieval works.
-
 ## Documentation
 
 - **[SKILL.md](.github/skills/repo-memory/SKILL.md)** — Full agent instructions and CLI reference
 - **[Architecture](docs/architecture.md)** — Design rationale and layers
 - **[Quick Start Guide](docs/quickstart.md)** — Step-by-step setup
 
+
 ## License
 
 MIT
+
