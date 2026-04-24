@@ -188,7 +188,7 @@ success "Virtual environment active"
 header "Installing Python dependencies"
 
 pip install --upgrade pip --quiet 2>/dev/null || true
-pip install agent-memory-toolkit azure-identity --quiet
+pip install "agent-memory-toolkit @ git+https://github.com/TheovanKraay/AgentMemoryToolkit.git" "azure-identity>=1.17" --quiet || die "Failed to install Python dependencies."
 success "Installed agent-memory-toolkit and azure-identity"
 
 # ── 5. Download skill files ─────────────────────────────────────────────────

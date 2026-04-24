@@ -151,7 +151,8 @@ Write-Ok "Virtual environment active"
 Write-Header "Installing Python dependencies"
 
 pip install --upgrade pip --quiet 2>$null
-pip install agent-memory-toolkit azure-identity --quiet
+pip install "agent-memory-toolkit @ git+https://github.com/TheovanKraay/AgentMemoryToolkit.git" "azure-identity>=1.17" --quiet
+if ($LASTEXITCODE -ne 0) { throw "Failed to install Python dependencies. Make sure git is installed (required for git+https:// packages)." }
 Write-Ok "Installed agent-memory-toolkit and azure-identity"
 
 # ── 5. Download skill files ─────────────────────────────────────────────────
@@ -257,9 +258,11 @@ if ($CosmosOk -and -not $SkipCosmos) {
         Write-Info "Initializing Cosmos DB..."
         try {
             python (Join-Path $SkillDir "scripts\memory_cli.py") init
+            if ($LASTEXITCODE -ne 0) { throw "init returned non-zero exit code" }
             Write-Ok "Cosmos DB initialized"
         } catch {
-            Write-Warn "Cosmos DB init failed. Run later: .github\skills\repo-memory\memory.ps1 init"
+            Write-Warn "Cosmos DB init failed: $_"
+            Write-Warn "Run later: .github\skills\repo-memory\memory.ps1 init"
         }
     }
 }
