@@ -2,17 +2,19 @@
 
 This repo has a persistent memory skill at `.github/skills/repo-memory/SKILL.md` — read it for full details.
 
-## Quick Start
+## IMPORTANT: Session Persistence
 
-**At session start** — load previous context:
+You MUST sync your conversations to the persistent memory store. This is how context survives between sessions.
+
+**At the START of every chat session**, run:
 - **Bash/macOS/Linux:** `.github/skills/repo-memory/memory session-import`
 - **PowerShell/Windows:** `.github\skills\repo-memory\memory.ps1 session-import`
 
-**At session end** — save this session's context:
+**After every significant exchange** (decisions, code changes, problem solving), run:
 - **Bash/macOS/Linux:** `.github/skills/repo-memory/memory session-export`
 - **PowerShell/Windows:** `.github\skills\repo-memory\memory.ps1 session-export`
 
-**Search past context:**
+**To search past context from previous sessions:**
 - **Bash/macOS/Linux:** `.github/skills/repo-memory/memory search --query "..." --user-id <agent-id>`
 - **PowerShell/Windows:** `.github\skills\repo-memory\memory.ps1 search --query "..." --user-id <agent-id>`
 
