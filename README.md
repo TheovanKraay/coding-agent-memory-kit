@@ -16,7 +16,7 @@ Stores all memories, session turns, facts, and summaries.
 - Enable **vector search** on the account (required for semantic search)
 - Authentication uses `DefaultAzureCredential` — run `az login` or configure a service principal
 - The CLI auto-creates the container on first `init` (with vector indexes, fulltext indexes, and hierarchical partition key)
-- **Important:** With Entra ID (DefaultAzureCredential) auth, you must create the database beforehand — Entra ID doesn't have permission to create databases. Create it via the Azure Portal or CLI:
+- **Important:** With Entra ID (DefaultAzureCredential) auth, you must create the **database** beforehand — Entra ID doesn't have permission to create databases (container creation works). Create it via the Azure Portal or CLI:
   ```bash
   az cosmosdb sql database create --account-name <account> --resource-group <rg> --name agent_memory
   ```
