@@ -144,14 +144,17 @@ if (Test-Path $venvActivate) {
     if ($LASTEXITCODE -ne 0) { throw "Failed to create virtual environment." }
 }
 
-& $venvActivate
-Write-Ok "Virtual environment active"
+$VenvPython = Join-Path $VenvDir "Scripts\python.exe"
+$VenvPip = Join-Path $VenvDir "Scripts\pip.exe"
+
+if (-not (Test-Path $VenvPython)) { throw "Venv python not found at $VenvPython" }
+Write-Ok "Virtual environment ready ($VenvPython)"
 
 # ── 4. Install Python dependencies ──────────────────────────────────────────
 Write-Header "Installing Python dependencies"
 
-pip install --upgrade pip --quiet 2>$null
-pip install "agent-memory-toolkit @ git+https://github.com/TheovanKraay/AgentMemoryToolkit.git" "azure-identity>=1.17" --quiet
+& $VenvPip install --upgrade pip --quiet 2>$null
+& $VenvPip install "agent-memory-toolkit @ git+https://github.com/TheovanKraay/AgentMemoryToolkit.git" "azure-identity>=1.17" --quiet
 if ($LASTEXITCODE -ne 0) { throw "Failed to install Python dependencies. Make sure git is installed (required for git+https:// packages)." }
 Write-Ok "Installed agent-memory-toolkit and azure-identity"
 
@@ -257,7 +260,7 @@ if ($CosmosOk -and -not $SkipCosmos) {
     if (Confirm-Action "Run 'memory_cli.py init' to set up Cosmos DB?") {
         Write-Info "Initializing Cosmos DB..."
         try {
-            python (Join-Path $SkillDir "scripts\memory_cli.py") init
+            & $VenvPython (Join-Path $SkillDir "scripts\memory_cli.py") init
             if ($LASTEXITCODE -ne 0) { throw "init returned non-zero exit code" }
             Write-Ok "Cosmos DB initialized"
         } catch {
@@ -274,16 +277,15 @@ $wrapperPath = Join-Path $SkillDir "memory.ps1"
 @'
 # Convenience wrapper for memory_cli.py
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-& (Join-Path $ScriptDir ".venv\Scripts\Activate.ps1")
-python (Join-Path $ScriptDir "scripts\memory_cli.py") @args
+$VenvPython = Join-Path $ScriptDir ".venv\Scripts\python.exe"
+& $VenvPython (Join-Path $ScriptDir "scripts\memory_cli.py") @args
 '@ | Set-Content $wrapperPath -Encoding UTF8
 
 # Also create a .cmd wrapper for cmd.exe users
 $cmdWrapper = Join-Path $SkillDir "memory.cmd"
 @"
 @echo off
-call "%~dp0.venv\Scripts\activate.bat"
-python "%~dp0scripts\memory_cli.py" %*
+"%~dp0.venv\Scripts\python.exe" "%~dp0scripts\memory_cli.py" %*
 "@ | Set-Content $cmdWrapper -Encoding ASCII
 
 Write-Ok "Created $wrapperPath (PowerShell)"
