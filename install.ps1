@@ -279,10 +279,13 @@ if ($env:AI_FOUNDRY_ENDPOINT) {
 
 if ($CosmosOk -and -not $SkipCosmos) {
     Write-Host ""
-    Write-Info "Cosmos DB requires a database and container. With Entra ID auth, these must be created beforehand."
-    Write-Info "You can create them in the Azure Portal, or run:"
+    Write-Info "Cosmos DB requires a database and container. With Entra ID auth, the database must be created beforehand."
+    Write-Info "Create it via the Azure Portal, or run:"
     Write-Info '  az cosmosdb sql database create --account-name <account> --resource-group <rg> --name agent_memory'
-    Write-Info '  az cosmosdb sql container create --account-name <account> --resource-group <rg> --database-name agent_memory --name memories --partition-key-path /userId'
+    Write-Host ""
+    Write-Warn "Note: Cosmos DB init may fail when run via 'irm | iex' due to credential path issues."
+    Write-Warn "If init fails below, just run it directly after install completes:"
+    Write-Warn "  .github\skills\repo-memory\memory.ps1 init"
     Write-Host ""
 
     if (-not $env:COSMOS_DB_DATABASE) {
