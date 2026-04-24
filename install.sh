@@ -284,7 +284,25 @@ else
 fi
 
 if $COSMOS_OK && ! $SKIP_COSMOS; then
-  if confirm "Run 'memory_cli.py init' to set up Cosmos DB database and container?"; then
+  echo ""
+  info "Cosmos DB requires a database and container. With Entra ID auth, these must be created beforehand."
+  info "You can create them in the Azure Portal, or run:"
+  info "  az cosmosdb sql database create --account-name <account> --resource-group <rg> --name agent_memory"
+  info "  az cosmosdb sql container create --account-name <account> --resource-group <rg> --database-name agent_memory --name memories --partition-key-path /userId"
+  echo ""
+
+  if [ -z "${COSMOS_DB_DATABASE:-}" ]; then
+    printf "${YELLOW}? ${NC}Cosmos DB database name [agent_memory]: "
+    read -r db_name
+    [ -n "$db_name" ] && export COSMOS_DB_DATABASE="$db_name"
+  fi
+  if [ -z "${COSMOS_DB_CONTAINER:-}" ]; then
+    printf "${YELLOW}? ${NC}Cosmos DB container name [memories]: "
+    read -r container_name
+    [ -n "$container_name" ] && export COSMOS_DB_CONTAINER="$container_name"
+  fi
+
+  if confirm "Run 'memory_cli.py init' to set up Cosmos DB? (will fail if database doesn't exist with Entra ID auth)"; then
     info "Initializing Cosmos DB..."
     if python "${SKILL_DIR}/scripts/memory_cli.py" init; then
       success "Cosmos DB initialized"

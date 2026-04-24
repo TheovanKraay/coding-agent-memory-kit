@@ -15,7 +15,11 @@ Stores all memories, session turns, facts, and summaries.
 - Create a Cosmos DB account with the **NoSQL API**
 - Enable **vector search** on the account (required for semantic search)
 - Authentication uses `DefaultAzureCredential` — run `az login` or configure a service principal
-- The CLI auto-creates the database and container on first `init` (with vector indexes, fulltext indexes, and hierarchical partition key)
+- The CLI auto-creates the container on first `init` (with vector indexes, fulltext indexes, and hierarchical partition key)
+- **Important:** With Entra ID (DefaultAzureCredential) auth, you must create the database beforehand — Entra ID doesn't have permission to create databases. Create it via the Azure Portal or CLI:
+  ```bash
+  az cosmosdb sql database create --account-name <account> --resource-group <rg> --name agent_memory
+  ```
 
 ### 2. Azure AI Foundry (formerly Azure OpenAI)
 

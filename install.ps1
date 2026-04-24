@@ -278,7 +278,23 @@ if ($env:AI_FOUNDRY_ENDPOINT) {
 }
 
 if ($CosmosOk -and -not $SkipCosmos) {
-    if (Confirm-Action "Run 'memory_cli.py init' to set up Cosmos DB?") {
+    Write-Host ""
+    Write-Info "Cosmos DB requires a database and container. With Entra ID auth, these must be created beforehand."
+    Write-Info "You can create them in the Azure Portal, or run:"
+    Write-Info '  az cosmosdb sql database create --account-name <account> --resource-group <rg> --name agent_memory'
+    Write-Info '  az cosmosdb sql container create --account-name <account> --resource-group <rg> --database-name agent_memory --name memories --partition-key-path /userId'
+    Write-Host ""
+
+    if (-not $env:COSMOS_DB_DATABASE) {
+        $dbName = Read-Host "Cosmos DB database name [agent_memory]"
+        if ($dbName) { $env:COSMOS_DB_DATABASE = $dbName }
+    }
+    if (-not $env:COSMOS_DB_CONTAINER) {
+        $containerName = Read-Host "Cosmos DB container name [memories]"
+        if ($containerName) { $env:COSMOS_DB_CONTAINER = $containerName }
+    }
+
+    if (Confirm-Action "Run 'memory_cli.py init' to set up Cosmos DB? (will fail if database doesn't exist with Entra ID auth)") {
         Write-Info "Initializing Cosmos DB..."
         try {
             & "$VenvPython" (Join-Path $SkillDir "scripts\memory_cli.py") init
