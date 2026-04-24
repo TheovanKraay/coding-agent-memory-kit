@@ -14,6 +14,15 @@ from pathlib import Path
 
 from agent_memory_toolkit import CosmosMemoryClient
 
+# Add scripts dir to path for session_sync imports
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+# Lazy import to avoid breaking existing commands if session_sync deps missing
+def _get_session_deps():
+    from session_sync import get_adapter, list_adapters
+    from session_sync.store import SessionStore
+    return get_adapter, list_adapters, SessionStore
+
 
 # ---------------------------------------------------------------------------
 # Client factory
@@ -177,6 +186,186 @@ def cmd_summarize_user(args):
 
 
 # ---------------------------------------------------------------------------
+# Session sync commands
+# ---------------------------------------------------------------------------
+
+def cmd_session_export(args):
+    get_adapter, _, SessionStore = _get_session_deps()
+    adapter = get_adapter(args.platform)
+    client = get_client()
+    store = SessionStore(client, user_id=args.user_id)
+
+    if args.all:
+        sessions = adapter.locate_sessions()
+        results = []
+        for s in sessions:
+            data = adapter.export_session(s.id)
+            cosmos_id = store.save_session(data)
+            results.append({"platform_session_id": s.id, "cosmos_session_id": cosmos_id})
+        _json_out({"exported": len(results), "sessions": results})
+    else:
+        if not args.session_id:
+            print(json.dumps({"error": "--session-id or --all required"}), file=sys.stderr)
+            sys.exit(1)
+        data = adapter.export_session(args.session_id)
+        cosmos_id = store.save_session(data)
+        _json_out({"platform_session_id": args.session_id, "cosmos_session_id": cosmos_id, "platform": adapter.platform})
+
+
+def cmd_session_import(args):
+    get_adapter, _, SessionStore = _get_session_deps()
+    adapter = get_adapter(args.platform)
+    client = get_client()
+    store = SessionStore(client, user_id=args.user_id)
+
+    session_data = store.get_session(args.session_id)
+    platform_session_id = adapter.import_session(session_data)
+
+    # Record the new platform_session_id mapping
+    store.update_platform_id(args.session_id, adapter.platform, platform_session_id)
+
+    resume_cmd = adapter.resume_command(platform_session_id)
+    _json_out({
+        "cosmos_session_id": args.session_id,
+        "platform": adapter.platform,
+        "platform_session_id": platform_session_id,
+        "resume_command": resume_cmd,
+    })
+
+
+def cmd_session_sync(args):
+    get_adapter, _, SessionStore = _get_session_deps()
+    adapter = get_adapter(args.platform)
+    client = get_client()
+    store = SessionStore(client, user_id=args.user_id)
+
+    local_sessions = adapter.locate_sessions()
+    cosmos_sessions = store.list_sessions(platform=None)  # All platforms for cross-matching
+
+    report = {"exported": 0, "imported": 0, "in_sync": 0, "conflicts_resolved": 0, "skipped_remote": 0, "details": []}
+
+    # Index cosmos sessions by platform_id and fingerprint
+    cosmos_by_pid = {}
+    cosmos_by_fp = {}
+    for cs in cosmos_sessions:
+        pids = cs.get("platform_ids", {})
+        pid = pids.get(adapter.platform)
+        if pid:
+            cosmos_by_pid[pid] = cs
+        fp = cs.get("fingerprint")
+        if fp:
+            cosmos_by_fp[fp] = cs
+
+    matched_cosmos_ids = set()
+
+    for ls in local_sessions:
+        # Try matching by platform_session_id
+        cs = cosmos_by_pid.get(ls.id)
+        if cs is None:
+            # Fallback: fingerprint
+            fp = ls.fingerprint()
+            cs = cosmos_by_fp.get(fp)
+
+        if cs is None:
+            # New local session → export
+            data = adapter.export_session(ls.id)
+            cosmos_id = store.save_session(data)
+            report["exported"] += 1
+            report["details"].append({"session_id": ls.id, "cosmos_session_id": cosmos_id, "action": "exported", "reason": "new_local"})
+        else:
+            cosmos_id = cs["cosmos_session_id"]
+            matched_cosmos_ids.add(cosmos_id)
+            local_ts = ls.updated_at or ""
+            remote_ts = cs.get("updated_at", "")
+            if local_ts > remote_ts:
+                data = adapter.export_session(ls.id)
+                store.save_session(data, cosmos_session_id=cosmos_id)
+                report["exported"] += 1
+                report["details"].append({"session_id": ls.id, "cosmos_session_id": cosmos_id, "action": "exported", "reason": "local_newer"})
+            elif remote_ts > local_ts:
+                session_data = store.get_session(cosmos_id)
+                pid = adapter.import_session(session_data)
+                store.update_platform_id(cosmos_id, adapter.platform, pid)
+                report["imported"] += 1
+                report["details"].append({"session_id": ls.id, "cosmos_session_id": cosmos_id, "action": "imported", "reason": "remote_newer"})
+            else:
+                report["in_sync"] += 1
+                report["details"].append({"session_id": ls.id, "cosmos_session_id": cosmos_id, "action": "skipped", "reason": "in_sync"})
+
+    # Remote-only sessions
+    for cs in cosmos_sessions:
+        cosmos_id = cs["cosmos_session_id"]
+        if cosmos_id in matched_cosmos_ids:
+            continue
+        # Skip if this platform already has a mapping (means we just didn't find local)
+        pids = cs.get("platform_ids", {})
+        if adapter.platform not in pids:
+            # Could import, but skip if no workspace match
+            report["skipped_remote"] += 1
+            report["details"].append({"cosmos_session_id": cosmos_id, "action": "skipped", "reason": "remote_only_no_platform_match"})
+        else:
+            report["skipped_remote"] += 1
+            report["details"].append({"cosmos_session_id": cosmos_id, "action": "skipped", "reason": "remote_only_local_missing"})
+
+    _json_out(report)
+
+
+def cmd_session_list(args):
+    get_adapter, list_adapters_fn, SessionStore = _get_session_deps()
+    client = get_client()
+    store = SessionStore(client, user_id=args.user_id)
+
+    result = {}
+
+    if args.source in ("local", "both"):
+        try:
+            adapter = get_adapter(args.platform)
+            local_sessions = adapter.locate_sessions()
+            result["local"] = [s.to_dict() for s in local_sessions]
+        except Exception as e:
+            result["local"] = {"error": str(e)}
+
+    if args.source in ("cosmos", "both"):
+        cosmos_sessions = store.list_sessions(platform=args.platform)
+        result["cosmos"] = cosmos_sessions
+
+    _json_out(result)
+
+
+def cmd_session_test(args):
+    get_adapter, list_adapters_fn, _ = _get_session_deps()
+    results = {}
+
+    platforms = [args.platform] if args.platform else list_adapters_fn()
+    for p in platforms:
+        try:
+            adapter = get_adapter(p)
+        except ValueError as e:
+            results[p] = {"status": "error", "message": str(e)}
+            continue
+
+        info = {"platform": p}
+        info["detected"] = adapter.detect()
+
+        if info["detected"]:
+            try:
+                sessions = adapter.locate_sessions()
+                info["sessions_found"] = len(sessions)
+                info["status"] = "ok"
+            except Exception as e:
+                info["sessions_found"] = 0
+                info["status"] = "partial"
+                info["locate_error"] = str(e)
+        else:
+            info["sessions_found"] = 0
+            info["status"] = "not_installed"
+
+        results[p] = info
+
+    _json_out(results)
+
+
+# ---------------------------------------------------------------------------
 # Argument parser
 # ---------------------------------------------------------------------------
 
@@ -243,6 +432,34 @@ def build_parser() -> argparse.ArgumentParser:
     su.add_argument("--user-id", required=True)
     su.add_argument("--thread-ids", default=None, help="Comma-separated thread IDs")
 
+    # session-export
+    se = sub.add_parser("session-export", help="Export local session(s) to Cosmos DB")
+    se.add_argument("--platform", default=None, help="Platform name (auto-detect if omitted)")
+    se.add_argument("--session-id", default=None, help="Platform session ID to export")
+    se.add_argument("--all", action="store_true", help="Export all local sessions")
+    se.add_argument("--user-id", required=True)
+
+    # session-import
+    si = sub.add_parser("session-import", help="Import a session from Cosmos DB to local platform")
+    si.add_argument("--session-id", required=True, help="Cosmos session ID")
+    si.add_argument("--platform", default=None, help="Target platform (auto-detect if omitted)")
+    si.add_argument("--user-id", required=True)
+
+    # session-sync
+    ss = sub.add_parser("session-sync", help="Bidirectional sync between local and Cosmos")
+    ss.add_argument("--platform", default=None)
+    ss.add_argument("--user-id", required=True)
+
+    # session-list
+    sl = sub.add_parser("session-list", help="List sessions from local, Cosmos, or both")
+    sl.add_argument("--platform", default=None)
+    sl.add_argument("--source", default="both", choices=["local", "cosmos", "both"])
+    sl.add_argument("--user-id", required=True)
+
+    # session-test
+    st2 = sub.add_parser("session-test", help="Test adapter detection and readiness")
+    st2.add_argument("--platform", default=None)
+
     return p
 
 
@@ -257,6 +474,11 @@ DISPATCH = {
     "summarize-thread": cmd_summarize_thread,
     "extract-facts": cmd_extract_facts,
     "summarize-user": cmd_summarize_user,
+    "session-export": cmd_session_export,
+    "session-import": cmd_session_import,
+    "session-sync": cmd_session_sync,
+    "session-list": cmd_session_list,
+    "session-test": cmd_session_test,
 }
 
 

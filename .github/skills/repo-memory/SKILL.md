@@ -193,3 +193,101 @@ Every file ends with a `## Session References` table linking to thread IDs store
 Markdown = portable, human-readable, git-tracked.
 Cosmos DB = searchable, scalable, vector-indexed.
 The CLI bridges both worlds.
+
+---
+
+## Session Sync
+
+Sync coding agent session state (conversation history) across machines via Cosmos DB. Supports Claude Code, GitHub Copilot, Cursor, and OpenAI Codex (best-effort).
+
+Sessions are stored as **individual turn documents** in Cosmos DB, with one metadata document per session. All documents share a `cosmos_session_id` partition key, enabling efficient full-session reads and granular search.
+
+### session-export — Export local sessions to Cosmos
+
+```bash
+# Export a single session (auto-detect platform)
+python $CLI session-export --session-id <platform-session-id> --user-id <agent-id>
+
+# Export with explicit platform
+python $CLI session-export --session-id <id> --platform claude-code --user-id <agent-id>
+
+# Export all local sessions
+python $CLI session-export --all --user-id <agent-id>
+```
+
+### session-import — Import a session from Cosmos to local platform
+
+```bash
+python $CLI session-import --session-id <cosmos-session-id> --user-id <agent-id>
+
+# Import to a specific platform
+python $CLI session-import --session-id <cosmos-id> --platform claude-code --user-id <agent-id>
+```
+
+Prints the resume command (e.g., `claude --resume <id>`).
+
+### session-sync — Bidirectional sync
+
+```bash
+python $CLI session-sync --user-id <agent-id> [--platform <name>]
+```
+
+Enumerates local sessions + Cosmos sessions, reconciles:
+- **New local** → exported to Cosmos
+- **Remote newer** → imported to local
+- **Local newer** → re-exported to Cosmos
+- **In sync** → skipped
+
+Prints a JSON sync report.
+
+### session-list — List sessions
+
+```bash
+# List from both local and Cosmos
+python $CLI session-list --user-id <agent-id>
+
+# Local only
+python $CLI session-list --user-id <agent-id> --source local
+
+# Cosmos only
+python $CLI session-list --user-id <agent-id> --source cosmos
+```
+
+### session-test — Validate adapter readiness
+
+```bash
+# Test all adapters
+python $CLI session-test
+
+# Test specific platform
+python $CLI session-test --platform claude-code
+```
+
+Reports: detected, sessions found, read/write status.
+
+### Session Sync Lifecycle
+
+1. **On machine A (end of session):**
+   ```bash
+   python $CLI session-export --session-id <id> --user-id <agent-id>
+   ```
+
+2. **On machine B (start of session):**
+   ```bash
+   python $CLI session-import --session-id <cosmos-id> --user-id <agent-id>
+   # Follow the printed resume command
+   ```
+
+3. **Or just sync everything:**
+   ```bash
+   python $CLI session-sync --user-id <agent-id>
+   ```
+
+### Supported Platforms
+
+| Platform | Fragility | Resume Support | Notes |
+|----------|-----------|----------------|-------|
+| Claude Code | Low | `claude --resume <id>` | JSON files, cleanest integration |
+| GitHub Copilot | High | Open VS Code | Reverse-engineered SQLite |
+| Cursor | High | Open Cursor | VS Code fork, similar to Copilot |
+| OpenAI Codex | Very High | N/A | Cloud-only, synthetic export only |
