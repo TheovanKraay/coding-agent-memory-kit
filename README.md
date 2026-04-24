@@ -137,14 +137,55 @@ The repo stores **pointers** to Cosmos DB sessions (session ID, date, agent, thr
 - **AgentMemoryToolkit** — handles Cosmos DB CRUD, vector/hybrid search, embeddings, Durable Functions pipelines
 - **Cosmos DB + AI Foundry** — scalable vector-indexed storage and embedding generation
 
+## Prerequisites
+
+You need two Azure services set up before using this kit:
+
+### 1. Azure Cosmos DB (NoSQL API)
+
+Stores all memories, session turns, facts, and summaries.
+
+- Create a Cosmos DB account with the **NoSQL API**
+- Enable **vector search** on the account (required for semantic search)
+- Authentication uses `DefaultAzureCredential` — run `az login` or configure a service principal
+- The CLI auto-creates the database and container on first `init` (with vector indexes, fulltext indexes, and hierarchical partition key)
+
+### 2. Azure AI Foundry (formerly Azure OpenAI)
+
+Generates vector embeddings for semantic and hybrid search. **Required for any search functionality.**
+
+- Create an [Azure AI Foundry](https://ai.azure.com/) resource (this is the rebranded Azure OpenAI Service)
+- Deploy an embedding model — the default is `text-embedding-3-large` but any embedding model works
+- The endpoint looks like: `https://your-resource.cognitiveservices.azure.com/` or `https://your-resource.openai.azure.com/`
+- Authentication uses `DefaultAzureCredential` (same `az login` as Cosmos DB)
+
+> **Without AI Foundry**, you can store and retrieve memories by ID/thread, but **vector search and hybrid search will not work**. If search is important to you (it probably is), this is effectively required.
+
+### 3. Azure Durable Functions (optional)
+
+Powers async pipelines for thread summarization, fact extraction, and user profile generation. These are convenience features — the core memory and session sync functionality works without them.
+
+---
+
 ## Quick Start
 
-1. **Prerequisites:** Azure Cosmos DB (NoSQL API, vector search enabled), `az login` completed
+1. **Authenticate with Azure:**
+   ```bash
+   az login
+   ```
 
 2. **Set environment variables:**
    ```bash
+   # Required
    export COSMOS_DB_ENDPOINT="https://your-account.documents.azure.com:443/"
-   export AI_FOUNDRY_ENDPOINT="https://your-foundry.cognitiveservices.azure.com/"  # optional
+
+   # Required for search (see Prerequisites above)
+   export AI_FOUNDRY_ENDPOINT="https://your-foundry.cognitiveservices.azure.com/"
+
+   # Optional — defaults shown
+   export COSMOS_DB_DATABASE="agent_memory"
+   export COSMOS_DB_CONTAINER="memories"
+   export EMBEDDING_MODEL="text-embedding-3-large"
    ```
 
 3. **Install & initialise:**
@@ -165,17 +206,19 @@ The repo stores **pointers** to Cosmos DB sessions (session ID, date, agent, thr
      --query "retry logic" --user-id agent-1 --hybrid
    ```
 
-## Configuration
+## Configuration Reference
 
 | Variable | Required | Default | Purpose |
 |----------|----------|---------|---------|
-| `COSMOS_DB_ENDPOINT` | Yes | — | Cosmos DB account URI |
+| `COSMOS_DB_ENDPOINT` | **Yes** | — | Cosmos DB account URI |
+| `AI_FOUNDRY_ENDPOINT` | **Yes**\* | — | Azure AI Foundry endpoint for embeddings |
 | `COSMOS_DB_DATABASE` | No | `agent_memory` | Database name |
 | `COSMOS_DB_CONTAINER` | No | `memories` | Container name |
-| `AI_FOUNDRY_ENDPOINT` | No | — | Azure AI Foundry for embeddings |
-| `EMBEDDING_MODEL` | No | `text-embedding-3-large` | Embedding model name |
-| `ADF_ENDPOINT` | No | — | Azure Durable Functions endpoint |
+| `EMBEDDING_MODEL` | No | `text-embedding-3-large` | Embedding model deployed in AI Foundry |
+| `ADF_ENDPOINT` | No | — | Azure Durable Functions endpoint (for summaries/facts) |
 | `ADF_KEY` | No | — | Durable Functions key |
+
+\* Required for vector/hybrid search. Without it, only ID-based retrieval works.
 
 ## Documentation
 
