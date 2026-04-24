@@ -386,9 +386,27 @@ else
 fi
 
 echo ""
-info "TIP: Copy .env.template to .env and fill in your Azure endpoints."
-info "This avoids env var issues in VS Code terminals."
-info "  cp .github/skills/repo-memory/.env.template .github/skills/repo-memory/.env"
+# Auto-create .env from current environment
+ENV_FILE="${SKILL_DIR}/.env"
+if [ ! -f "$ENV_FILE" ]; then
+  ENV_LINES=""
+  [ -n "${COSMOS_DB_ENDPOINT:-}" ] && ENV_LINES="${ENV_LINES}COSMOS_DB_ENDPOINT=${COSMOS_DB_ENDPOINT}\n"
+  [ -n "${AI_FOUNDRY_ENDPOINT:-}" ] && ENV_LINES="${ENV_LINES}AI_FOUNDRY_ENDPOINT=${AI_FOUNDRY_ENDPOINT}\n"
+  [ -n "${COSMOS_DB_DATABASE:-}" ] && ENV_LINES="${ENV_LINES}COSMOS_DB_DATABASE=${COSMOS_DB_DATABASE}\n"
+  [ -n "${COSMOS_DB_CONTAINER:-}" ] && ENV_LINES="${ENV_LINES}COSMOS_DB_CONTAINER=${COSMOS_DB_CONTAINER}\n"
+  [ -n "${EMBEDDING_MODEL:-}" ] && ENV_LINES="${ENV_LINES}EMBEDDING_MODEL=${EMBEDDING_MODEL}\n"
+  [ -n "${ADF_ENDPOINT:-}" ] && ENV_LINES="${ENV_LINES}ADF_ENDPOINT=${ADF_ENDPOINT}\n"
+  [ -n "${ADF_KEY:-}" ] && ENV_LINES="${ENV_LINES}ADF_KEY=${ADF_KEY}\n"
+  if [ -n "$ENV_LINES" ]; then
+    printf "$ENV_LINES" > "$ENV_FILE"
+    success "Created .env with your current Azure configuration"
+  else
+    warn "No Azure env vars detected. Copy .env.template to .env and fill in manually:"
+    warn "  cp .github/skills/repo-memory/.env.template .github/skills/repo-memory/.env"
+  fi
+else
+  info ".env already exists"
+fi
 
 printf "\n${BOLD}Usage:${NC}\n"
 echo "  # Store a memory"

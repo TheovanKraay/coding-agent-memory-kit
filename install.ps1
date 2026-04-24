@@ -400,9 +400,27 @@ if ($CosmosOk -and $FoundryOk) {
 }
 
 Write-Host ""
-Write-Info "TIP: Copy .env.template to .env and fill in your Azure endpoints."
-Write-Info "This avoids env var issues in VS Code terminals."
-Write-Info "  cp .github\skills\repo-memory\.env.template .github\skills\repo-memory\.env"
+# Auto-create .env from current environment
+$envFile = Join-Path $SkillDir ".env"
+if (-not (Test-Path $envFile)) {
+    $envLines = @()
+    if ($env:COSMOS_DB_ENDPOINT) { $envLines += "COSMOS_DB_ENDPOINT=$($env:COSMOS_DB_ENDPOINT)" }
+    if ($env:AI_FOUNDRY_ENDPOINT) { $envLines += "AI_FOUNDRY_ENDPOINT=$($env:AI_FOUNDRY_ENDPOINT)" }
+    if ($env:COSMOS_DB_DATABASE) { $envLines += "COSMOS_DB_DATABASE=$($env:COSMOS_DB_DATABASE)" }
+    if ($env:COSMOS_DB_CONTAINER) { $envLines += "COSMOS_DB_CONTAINER=$($env:COSMOS_DB_CONTAINER)" }
+    if ($env:EMBEDDING_MODEL) { $envLines += "EMBEDDING_MODEL=$($env:EMBEDDING_MODEL)" }
+    if ($env:ADF_ENDPOINT) { $envLines += "ADF_ENDPOINT=$($env:ADF_ENDPOINT)" }
+    if ($env:ADF_KEY) { $envLines += "ADF_KEY=$($env:ADF_KEY)" }
+    if ($envLines.Count -gt 0) {
+        $envLines | Set-Content $envFile -Encoding UTF8
+        Write-Ok "Created .env with your current Azure configuration"
+    } else {
+        Write-Warn "No Azure env vars detected. Copy .env.template to .env and fill in manually:"
+        Write-Warn "  cp .github\skills\repo-memory\.env.template .github\skills\repo-memory\.env"
+    }
+} else {
+    Write-Info ".env already exists"
+}
 
 Write-Host ""
 Write-Host "Usage:" -ForegroundColor White
