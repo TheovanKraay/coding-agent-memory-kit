@@ -154,16 +154,27 @@ Write-Ok "Virtual environment ready"
 # ── 4. Install Python dependencies ──────────────────────────────────────────
 Write-Header "Installing Python dependencies"
 
-# Ensure pip is available in the venv (Windows Python may omit it)
+# Ensure pip is available in the venv
 try { & "$VenvPython" -m ensurepip --upgrade 2>$null } catch { }
-# Upgrade pip via get-pip.py to avoid pip 25.x "No module named pip.main" bug
+# Bootstrap pip via get-pip.py to avoid pip 25.x bugs
+$getPip = Join-Path $VenvDir "get-pip.py"
 try {
-    $getPip = Join-Path $VenvDir "get-pip.py"
     Invoke-RestMethod -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPip
     & "$VenvPython" $getPip --quiet 2>$null
     Remove-Item $getPip -ErrorAction SilentlyContinue
-} catch { }
-& "$VenvPython" -m pip install "agent-memory-toolkit @ git+https://github.com/TheovanKraay/AgentMemoryToolkit.git" "azure-identity>=1.17" --quiet
+} catch { Write-Warn "get-pip.py failed, trying existing pip" }
+
+# Use pip executable directly (not python -m pip)
+$VenvPipExe = Join-Path $VenvDir "Scripts\pip.exe"
+if (-not (Test-Path $VenvPipExe)) {
+    # Last resort: try pip3.exe
+    $VenvPipExe = Join-Path $VenvDir "Scripts\pip3.exe"
+}
+if (-not (Test-Path $VenvPipExe)) {
+    throw "pip not found in venv after bootstrap. Try: $PythonCmd -m pip --version"
+}
+Write-Info "Using pip at: $VenvPipExe"
+& "$VenvPipExe" install "agent-memory-toolkit @ git+https://github.com/TheovanKraay/AgentMemoryToolkit.git" "azure-identity>=1.17" --quiet
 if ($LASTEXITCODE -ne 0) { throw "Failed to install Python dependencies. Make sure git is installed (required for git+https:// packages)." }
 Write-Ok "Installed agent-memory-toolkit and azure-identity"
 
