@@ -1,0 +1,30 @@
+# Repo Memory — Persistent Context Across Sessions
+
+This repo has a persistent memory skill at `.github/skills/repo-memory/SKILL.md` — read it for full details.
+
+## Quick Start
+
+**At session start** — load previous context:
+```
+.github/skills/repo-memory/memory session-import
+```
+
+**At session end** — save this session's context:
+```
+.github/skills/repo-memory/memory session-export
+```
+
+**Search past context:**
+```
+.github/skills/repo-memory/memory search --query "..." --user-id <agent-id>
+```
+
+## Keep Artifacts Updated
+
+As you work, maintain these files in the repo root:
+- **STATE.md** — current project state and active tasks
+- **DECISIONS.md** — architectural and design decisions with rationale
+- **FAILURES.md** — what went wrong and lessons learned
+- **CHANGELOG.md** — significant changes made
+
+These files ARE your long-term memory. Future sessions depend on them.

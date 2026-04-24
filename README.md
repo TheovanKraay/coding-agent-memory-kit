@@ -96,6 +96,19 @@ The repo artifacts are human-readable summaries. Cosmos DB holds the full conver
 
 > **Flags:** Pass `--yes` to skip prompts (for CI). Pass `--skip-cosmos` to install files only.
 
+### Agent instruction files
+
+The installer automatically creates instruction files so each coding agent knows about the memory skill on first launch:
+
+| File | Agent |
+|---|---|
+| `.github/copilot-instructions.md` | GitHub Copilot |
+| `CLAUDE.md` | Claude Code |
+| `.cursorrules` | Cursor |
+| `AGENTS.md` (append only) | Codex / OpenAI agents |
+
+If a file already exists, the snippet is appended. Re-runs are safe — the installer checks for `repo-memory` before writing. The source snippet lives at `.github/skills/repo-memory/agent-instructions.md`.
+
 ---
 
 

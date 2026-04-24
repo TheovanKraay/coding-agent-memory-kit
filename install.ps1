@@ -331,7 +331,46 @@ $cmdWrapper = Join-Path $SkillDir "memory.cmd"
 Write-Ok "Created $wrapperPath (PowerShell)"
 Write-Ok "Created $cmdWrapper (cmd.exe)"
 
-# ── 10. Summary ──────────────────────────────────────────────────────────────
+# ── 10. Configure agent instruction files ────────────────────────────────────
+Write-Header "Configuring agent instruction files"
+
+$snippetPath = Join-Path $SkillDir "agent-instructions.md"
+if (-not (Test-Path $snippetPath)) {
+    Write-Warn "agent-instructions.md not found at $snippetPath — skipping agent config"
+} else {
+    $snippet = Get-Content $snippetPath -Raw
+    $agentFiles = @(
+        @{ Path = (Join-Path $WorkDir ".github\copilot-instructions.md"); Name = ".github/copilot-instructions.md" },
+        @{ Path = (Join-Path $WorkDir "CLAUDE.md"); Name = "CLAUDE.md" },
+        @{ Path = (Join-Path $WorkDir ".cursorrules"); Name = ".cursorrules" },
+        @{ Path = (Join-Path $WorkDir "AGENTS.md"); Name = "AGENTS.md" }
+    )
+
+    foreach ($f in $agentFiles) {
+        $fPath = $f.Path
+        $fName = $f.Name
+        if ($fName -eq "AGENTS.md" -and -not (Test-Path $fPath)) {
+            # Only append to AGENTS.md if it already exists
+            continue
+        }
+        if (Test-Path $fPath) {
+            $existing = Get-Content $fPath -Raw
+            if ($existing -match "repo-memory") {
+                Write-Info "$fName already mentions repo-memory — skipped"
+                continue
+            }
+            Add-Content -Path $fPath -Value "`n`n$snippet"
+            Write-Ok "Updated $fName (appended)"
+        } else {
+            $parentDir = Split-Path $fPath -Parent
+            if (-not (Test-Path $parentDir)) { New-Item -ItemType Directory -Path $parentDir -Force | Out-Null }
+            Set-Content -Path $fPath -Value $snippet -Encoding UTF8
+            Write-Ok "Created $fName"
+        }
+    }
+}
+
+# ── 11. Summary ──────────────────────────────────────────────────────────────
 Write-Header "Installation complete! 🎉"
 
 Write-Host ""

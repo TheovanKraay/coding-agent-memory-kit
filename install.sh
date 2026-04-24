@@ -326,7 +326,41 @@ WRAPPER
 chmod +x "${SKILL_DIR}/memory"
 success "Created ${SKILL_DIR}/memory (executable)"
 
-# ── 10. Summary ──────────────────────────────────────────────────────────────
+# ── 10. Configure agent instruction files ────────────────────────────────────
+header "Configuring agent instruction files"
+
+SNIPPET_PATH="${SKILL_DIR}/agent-instructions.md"
+if [ ! -f "$SNIPPET_PATH" ]; then
+  warn "agent-instructions.md not found — skipping agent config"
+else
+  SNIPPET=$(cat "$SNIPPET_PATH")
+
+  inject_snippet() {
+    local file="$1" name="$2" create_if_missing="$3"
+    if [ "$create_if_missing" = "false" ] && [ ! -f "$file" ]; then
+      return
+    fi
+    if [ -f "$file" ]; then
+      if grep -q "repo-memory" "$file" 2>/dev/null; then
+        info "$name already mentions repo-memory — skipped"
+        return
+      fi
+      printf "\n\n%s" "$SNIPPET" >> "$file"
+      success "Updated $name (appended)"
+    else
+      mkdir -p "$(dirname "$file")"
+      printf "%s\n" "$SNIPPET" > "$file"
+      success "Created $name"
+    fi
+  }
+
+  inject_snippet ".github/copilot-instructions.md" ".github/copilot-instructions.md" "true"
+  inject_snippet "CLAUDE.md" "CLAUDE.md" "true"
+  inject_snippet ".cursorrules" ".cursorrules" "true"
+  inject_snippet "AGENTS.md" "AGENTS.md" "false"
+fi
+
+# ── 11. Summary ──────────────────────────────────────────────────────────────
 header "Installation complete! 🎉"
 
 printf "\n"
