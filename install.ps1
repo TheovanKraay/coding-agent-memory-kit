@@ -193,7 +193,8 @@ $SkillFiles = @(
     ".github/skills/repo-memory/scripts/session_sync/cursor.py",
     ".github/skills/repo-memory/scripts/session_sync/codex.py",
     ".github/skills/repo-memory/scripts/session_sync/openclaw.py",
-    ".github/skills/repo-memory/scripts/session_sync/store.py"
+    ".github/skills/repo-memory/scripts/session_sync/store.py",
+    ".github/skills/repo-memory/agent-instructions.md"
 )
 
 foreach ($file in $SkillFiles) {

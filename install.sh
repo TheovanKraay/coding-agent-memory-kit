@@ -207,6 +207,7 @@ SKILL_FILES=(
   ".github/skills/repo-memory/scripts/session_sync/codex.py"
   ".github/skills/repo-memory/scripts/session_sync/openclaw.py"
   ".github/skills/repo-memory/scripts/session_sync/store.py"
+  ".github/skills/repo-memory/agent-instructions.md"
 )
 
 for file in "${SKILL_FILES[@]}"; do
