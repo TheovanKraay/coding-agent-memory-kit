@@ -169,40 +169,73 @@ Powers async pipelines for thread summarization, fact extraction, and user profi
 
 ## Quick Start
 
-**1. Set up Azure resources** (see [Prerequisites](#prerequisites) above), then set your environment variables:
+**1. Set up Azure** (see [Prerequisites](#prerequisites) above):
 
 ```bash
 az login
-
 export COSMOS_DB_ENDPOINT="https://your-account.documents.azure.com:443/"
 export AI_FOUNDRY_ENDPOINT="https://your-foundry.cognitiveservices.azure.com/"
 ```
 
-**2. Install into your repo** — run this from the root of any repo:
+**2. Install** — from the root of any repo:
 
 ```bash
 curl -sL https://raw.githubusercontent.com/TheovanKraay/coding-agent-memory-kit/main/install.sh | bash
 ```
 
-That's it. The installer detects your OS, installs Python if needed, creates an isolated virtual environment, downloads the skill files, copies markdown templates, and initializes Cosmos DB — all in one step.
+**That's it.** The installer handles everything: Python, dependencies, skill files, Cosmos DB setup.
 
-> **Flags:** Pass `--yes` to skip prompts (for CI). Pass `--skip-cosmos` to install files only without Cosmos DB setup.
+### What happens next
 
-**3. Use it:**
+Once installed, your coding agent sessions are automatically synced:
+
+- **Session export** — when an agent session ends, its full conversation history is stored in Cosmos DB as individual turn documents, vector-indexed and searchable
+- **Session import** — when a new agent starts (same machine or different), it checks Cosmos DB for previous sessions on this repo and can resume where the last agent left off
+- **Cross-platform** — a session started in Claude Code on your laptop can be resumed in Cursor on your desktop, or picked up by an OpenClaw agent on a VPS
+- **Semantic search** — any agent can search across all past sessions: *"what did we decide about authentication?"*
+
+The skill instructs agents how to do this automatically via [SKILL.md](.github/skills/repo-memory/SKILL.md). You don't need to run commands manually — the agent reads the skill and handles session sync on its own.
+
+### What gets stored
+
+| In your repo (git-tracked) | In Cosmos DB (cloud-synced) |
+|---|---|
+| `STATE.md` — current project state | Full session transcripts (per-turn documents) |
+| `DECISIONS.md` — architectural decisions | Vector embeddings for semantic search |
+| `FAILURES.md` — what went wrong | Session metadata (platform, machine, workspace) |
+| `CHANGELOG.md` — what changed | Extracted facts and thread summaries |
+| `AGENTS.md` — who works on this repo | Cross-session user profiles |
+
+The repo artifacts are human-readable summaries. Cosmos DB holds the full conversation history — the [conversation-as-artifact](docs/session-sync-architecture.md#conversations-as-code-artifacts) that is now the primary record of how and why code was written.
+
+> **Flags:** Pass `--yes` to skip prompts (for CI). Pass `--skip-cosmos` to install files only.
+
+---
+
+## CLI Reference
+
+For advanced use or manual operations, the skill includes a CLI:
 
 ```bash
-# Store a memory
+# Sync all local agent sessions to/from Cosmos DB
+.github/skills/repo-memory/memory session-sync
+
+# List sessions (local, cosmos, or both)
+.github/skills/repo-memory/memory session-list --source both
+
+# Search across all past sessions
+.github/skills/repo-memory/memory search --query "auth decision" --user-id agent-1 --hybrid
+
+# Store a memory manually
 .github/skills/repo-memory/memory add \
   --user-id agent-1 --thread-id sess-001 --role agent \
   --content "Decided to use retry logic"
 
-# Search memories
-.github/skills/repo-memory/memory search \
-  --query "retry logic" --user-id agent-1 --hybrid
-
-# Sync coding agent sessions to Cosmos DB
-.github/skills/repo-memory/memory session-sync
+# Test which platform adapters work on this machine
+.github/skills/repo-memory/memory session-test
 ```
+
+See [SKILL.md](.github/skills/repo-memory/SKILL.md) for the full command reference.
 
 ## Configuration Reference
 
