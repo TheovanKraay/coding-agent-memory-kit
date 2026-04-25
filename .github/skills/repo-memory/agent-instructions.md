@@ -42,10 +42,10 @@ Before starting complex work, search for relevant prior context:
 
 ## Keep Artifacts Updated
 
-As you work, maintain these files in the repo root:
-- **STATE.md** — current project state and active tasks
-- **DECISIONS.md** — architectural and design decisions with rationale
-- **FAILURES.md** — what went wrong and lessons learned
-- **CHANGELOG.md** — significant changes made
+As you work, maintain these files under `.github/memory/`:
+- **`.github/memory/STATE.md`** — current project state and active tasks
+- **`.github/memory/DECISIONS.md`** — architectural and design decisions with rationale
+- **`.github/memory/FAILURES.md`** — what went wrong and lessons learned
+- **`.github/memory/CHANGELOG.md`** — significant changes made
 
 These files ARE your long-term memory. Future sessions depend on them.

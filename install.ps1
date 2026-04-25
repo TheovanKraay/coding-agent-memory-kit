@@ -216,21 +216,25 @@ foreach ($file in $SkillFiles) {
 # ── 6. Copy markdown templates ──────────────────────────────────────────────
 Write-Header "Setting up markdown templates"
 
+$MemoryDir = Join-Path $WorkDir ".github\memory"
+New-Item -ItemType Directory -Path $MemoryDir -Force | Out-Null
+
 $Templates = @("STATE.md", "DECISIONS.md", "CHANGELOG.md", "FAILURES.md", "AGENTS.md")
 
 foreach ($tmpl in $Templates) {
-    if (Test-Path $tmpl) {
-        $SkippedTemplates += $tmpl
-        Write-Info "Skipped $tmpl (already exists)"
+    $dest = Join-Path $MemoryDir $tmpl
+    if (Test-Path $dest) {
+        $SkippedTemplates += ".github/memory/$tmpl"
+        Write-Info "Skipped .github/memory/$tmpl (already exists)"
     } else {
         $templateDir = Join-Path $SkillDir "templates"
         New-Item -ItemType Directory -Path $templateDir -Force | Out-Null
         $src = Join-Path $templateDir $tmpl
         try {
             Invoke-RestMethod -Uri "$RepoUrl/.github/skills/repo-memory/templates/$tmpl" -OutFile $src
-            Copy-Item $src $tmpl
-            $CreatedTemplates += $tmpl
-            Write-Ok "Created $tmpl"
+            Copy-Item $src $dest
+            $CreatedTemplates += ".github/memory/$tmpl"
+            Write-Ok "Created .github/memory/$tmpl"
         } catch {
             Write-Warn "Could not download template $tmpl"
         }

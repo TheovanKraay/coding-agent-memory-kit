@@ -86,10 +86,10 @@ The skill instructs agents how to do this automatically via [SKILL.md](.github/s
 
 | In your repo (git-tracked) | In Cosmos DB (cloud-synced) |
 |---|---|
-| `STATE.md` — current project state | Full session transcripts (per-turn documents) |
-| `DECISIONS.md` — architectural decisions | Vector embeddings for semantic search |
-| `FAILURES.md` — what went wrong | Session metadata (platform, machine, workspace) |
-| `CHANGELOG.md` — what changed | Extracted facts and thread summaries |
+| `.github/memory/STATE.md` — current project state | Full session transcripts (per-turn documents) |
+| `.github/memory/DECISIONS.md` — architectural decisions | Vector embeddings for semantic search |
+| `.github/memory/FAILURES.md` — what went wrong | Session metadata (platform, machine, workspace) |
+| `.github/memory/CHANGELOG.md` — what changed | Extracted facts and thread summaries |
 | `AGENTS.md` — who works on this repo | Cross-session user profiles |
 
 The repo artifacts are human-readable summaries. Cosmos DB holds the full conversation history — the [conversation-as-artifact](docs/session-sync-architecture.md#conversations-as-code-artifacts) that is now the primary record of how and why code was written.
@@ -184,11 +184,11 @@ Platforms like GitHub Copilot's memory or Cursor's context treat agent interacti
 
 | File | Purpose | Why it matters |
 |------|---------|----------------|
-| **`DECISIONS.md`** | Architectural Decision Records — what was decided, by whom, why | Agents stop re-debating settled questions. New team members understand rationale. |
-| **`STATE.md`** | Living project state — in progress, blocked, done | Any agent reads this on startup and knows exactly where things stand. |
-| **`FAILURES.md`** | What went wrong and lessons learned | Agents stop repeating the same mistakes. Institutional knowledge survives. |
-| **`CHANGELOG.md`** | What changed, when, by whom (human or agent) | Audit trail that travels with the code. |
-| **`AGENTS.md`** | Who works on this repo — humans and AI agents | Context for multi-agent and multi-developer collaboration. |
+| **`.github/memory/DECISIONS.md`** | Architectural Decision Records — what was decided, by whom, why | Agents stop re-debating settled questions. New team members understand rationale. |
+| **`.github/memory/STATE.md`** | Living project state — in progress, blocked, done | Any agent reads this on startup and knows exactly where things stand. |
+| **`.github/memory/FAILURES.md`** | What went wrong and lessons learned | Agents stop repeating the same mistakes. Institutional knowledge survives. |
+| **`.github/memory/CHANGELOG.md`** | What changed, when, by whom (human or agent) | Audit trail that travels with the code. |
+| **`.github/memory/AGENTS.md`** | Who works on this repo — humans and AI agents | Context for multi-agent and multi-developer collaboration. |
 
 These aren't log files. They're **living project artifacts** with defined structure and semantics, designed to be read by agents at session start and updated as work progresses.
 
@@ -248,7 +248,7 @@ The repo stores **pointers** to Cosmos DB sessions (session ID, date, agent, thr
               │
               ▼
  ┌─── Session Start ───────────────────────────────────┐
- │  Agent reads STATE.md, DECISIONS.md, FAILURES.md    │
+ │  Agent reads .github/memory/STATE.md, DECISIONS.md, FAILURES.md    │
  │  Agent searches Cosmos DB for relevant past context  │
  │  → Instant project awareness, zero re-explanation    │
  └─────────────────────────────────────────────────────┘
@@ -283,7 +283,7 @@ The repo stores **pointers** to Cosmos DB sessions (session ID, date, agent, thr
 └─────────────────┘     └──────────────┘     └────────────────────┘     └──────────────┘
 ```
 
-- **Repo Markdown** — human-readable, git-tracked files (STATE.md, DECISIONS.md, etc.)
+- **Repo Markdown** — human-readable, git-tracked files (`.github/memory/STATE.md`, `DECISIONS.md`, etc.)
 - **memory_cli.py** — single CLI wrapping `CosmosMemoryClient` from the toolkit
 - **AgentMemoryToolkit** — handles Cosmos DB CRUD, vector/hybrid search, embeddings, Durable Functions pipelines
 - **Cosmos DB + AI Foundry** — scalable vector-indexed storage and embedding generation

@@ -225,20 +225,24 @@ done
 # ── 6. Copy markdown templates ──────────────────────────────────────────────
 header "Setting up markdown templates"
 
+MEMORY_DIR=".github/memory"
+mkdir -p "$MEMORY_DIR"
+
 TEMPLATES=("STATE.md" "DECISIONS.md" "CHANGELOG.md" "FAILURES.md" "AGENTS.md")
 
 for tmpl in "${TEMPLATES[@]}"; do
-  if [ -f "$tmpl" ]; then
-    SKIPPED_TEMPLATES+=("$tmpl")
-    info "Skipped ${tmpl} (already exists)"
+  dest="${MEMORY_DIR}/${tmpl}"
+  if [ -f "$dest" ]; then
+    SKIPPED_TEMPLATES+=("$dest")
+    info "Skipped ${dest} (already exists)"
   else
     src="${SKILL_DIR}/templates/${tmpl}"
     # Download template if not already present
     mkdir -p "${SKILL_DIR}/templates"
     if curl -sfL "${REPO_URL}/.github/skills/repo-memory/templates/${tmpl}" -o "$src" 2>/dev/null; then
-      cp "$src" "$tmpl"
-      CREATED_TEMPLATES+=("$tmpl")
-      success "Created ${tmpl}"
+      cp "$src" "$dest"
+      CREATED_TEMPLATES+=("$dest")
+      success "Created ${dest}"
     else
       warn "Could not download template ${tmpl}"
     fi

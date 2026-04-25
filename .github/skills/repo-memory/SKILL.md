@@ -38,7 +38,7 @@ CLI=".github/skills/repo-memory/scripts/memory_cli.py"
 python $CLI init
 ```
 
-Creates the Cosmos DB database/container (with vector + fulltext indexes, hierarchical partition key) and copies markdown templates (`STATE.md`, `DECISIONS.md`, `AGENTS.md`, `CHANGELOG.md`, `FAILURES.md`) to the repo root if they don't exist.
+Creates the Cosmos DB database/container (with vector + fulltext indexes, hierarchical partition key) and copies markdown templates (`STATE.md`, `DECISIONS.md`, `AGENTS.md`, `CHANGELOG.md`, `FAILURES.md`) to `.github/memory/` if they don't exist.
 
 ### add — Store a single memory
 
@@ -125,7 +125,7 @@ python $CLI summarize-user --user-id agent-1 --thread-ids sess-001,sess-002,sess
    ```bash
    python $CLI init
    ```
-2. **Read context:** Open `STATE.md` and `DECISIONS.md` for project state.
+2. **Read context:** Open `.github/memory/STATE.md` and `.github/memory/DECISIONS.md` for project state.
 3. **Rehydrate from Cosmos (optional):**
    ```bash
    python $CLI get-user-summary --user-id <agent-id>
@@ -134,9 +134,9 @@ python $CLI summarize-user --user-id agent-1 --thread-ids sess-001,sess-002,sess
 
 ### During Session
 
-- **Log decisions** → append to `DECISIONS.md`
-- **Log state changes** → update `STATE.md`
-- **Log failures** → append to `FAILURES.md`
+- **Log decisions** → append to `.github/memory/DECISIONS.md`
+- **Log state changes** → update `.github/memory/STATE.md`
+- **Log failures** → append to `.github/memory/FAILURES.md`
 - **Store turns** individually or batch via `sync`
 
 ### On Session End
@@ -159,7 +159,7 @@ python $CLI summarize-user --user-id agent-1 --thread-ids sess-001,sess-002,sess
    ```
 5. **Commit markdown changes:**
    ```bash
-   git add STATE.md DECISIONS.md CHANGELOG.md FAILURES.md AGENTS.md
+   git add .github/memory/STATE.md .github/memory/DECISIONS.md .github/memory/CHANGELOG.md .github/memory/FAILURES.md .github/memory/AGENTS.md
    git commit -m "session sess-001: <summary>"
    ```
 
@@ -178,7 +178,7 @@ python $CLI get-thread --thread-id sess-001
 
 ## Markdown Files
 
-Each markdown file in the repo root serves as human-readable, git-tracked memory. Chat content is **never** stored in these files — only summaries, decisions, and references to Cosmos DB threads.
+Each markdown file in `.github/memory/` serves as human-readable, git-tracked memory. Chat content is **never** stored in these files — only summaries, decisions, and references to Cosmos DB threads.
 
 Every file ends with a `## Session References` table linking to thread IDs stored in Cosmos DB.
 
