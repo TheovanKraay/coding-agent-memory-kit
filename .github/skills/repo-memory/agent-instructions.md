@@ -10,19 +10,21 @@ When the user says **"export session"**, **"save session"**, or **"save this con
 
 ### Saving conversations (after every significant exchange)
 
-Generate a unique thread ID at the start of each session (e.g. a timestamp like `2026-04-25-1330`). Then after each significant exchange, store the turns:
+Generate a unique thread ID at the start of each session (e.g. a timestamp like `2026-04-25-1330`). Then after each significant exchange, store the turns with **VERBATIM content** — copy the exact text, not a summary:
 
 **PowerShell/Windows:**
 ```
-.github\skills\repo-memory\memory.ps1 add --user-id copilot --thread-id <session-id> --role user --content "what the user asked"
-.github\skills\repo-memory\memory.ps1 add --user-id copilot --thread-id <session-id> --role assistant --content "summary of what you did/responded"
+.github\skills\repo-memory\memory.ps1 add --user-id copilot --thread-id <session-id> --role user --content "<EXACT text the user typed, verbatim>"
+.github\skills\repo-memory\memory.ps1 add --user-id copilot --thread-id <session-id> --role assistant --content "<EXACT text of your response, verbatim>"
 ```
 
 **Bash/macOS/Linux:**
 ```
-.github/skills/repo-memory/memory add --user-id copilot --thread-id <session-id> --role user --content "what the user asked"
-.github/skills/repo-memory/memory add --user-id copilot --thread-id <session-id> --role assistant --content "summary of what you did/responded"
+.github/skills/repo-memory/memory add --user-id copilot --thread-id <session-id> --role user --content "<EXACT text the user typed, verbatim>"
+.github/skills/repo-memory/memory add --user-id copilot --thread-id <session-id> --role assistant --content "<EXACT text of your response, verbatim>"
 ```
+
+**IMPORTANT:** Store the actual message content, NOT a summary. The content should be the real words spoken, not descriptions like "Asked about X" or "Explained Y".
 
 Keep the same `--thread-id` for the entire session so all turns are grouped together.
 
