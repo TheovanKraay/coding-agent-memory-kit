@@ -4,19 +4,19 @@ This repo has a persistent memory skill at `.github/skills/repo-memory/SKILL.md`
 
 ## IMPORTANT: Session Persistence
 
-You MUST sync your conversations to the persistent memory store. This is how context survives between sessions.
+You MUST sync your conversations to the persistent memory store. This is how context survives between sessions. Use your agent name as `--user-id` (e.g. `copilot`, `claude`, `cursor`).
 
 **At the START of every chat session**, run:
-- **Bash/macOS/Linux:** `.github/skills/repo-memory/memory session-import`
-- **PowerShell/Windows:** `.github\skills\repo-memory\memory.ps1 session-import`
+- **Bash/macOS/Linux:** `.github/skills/repo-memory/memory session-import --user-id copilot`
+- **PowerShell/Windows:** `.github\skills\repo-memory\memory.ps1 session-import --user-id copilot`
 
 **After every significant exchange** (decisions, code changes, problem solving), run:
-- **Bash/macOS/Linux:** `.github/skills/repo-memory/memory session-export`
-- **PowerShell/Windows:** `.github\skills\repo-memory\memory.ps1 session-export`
+- **Bash/macOS/Linux:** `.github/skills/repo-memory/memory session-export --user-id copilot`
+- **PowerShell/Windows:** `.github\skills\repo-memory\memory.ps1 session-export --user-id copilot`
 
 **To search past context from previous sessions:**
-- **Bash/macOS/Linux:** `.github/skills/repo-memory/memory search --query "..." --user-id <agent-id>`
-- **PowerShell/Windows:** `.github\skills\repo-memory\memory.ps1 search --query "..." --user-id <agent-id>`
+- **Bash/macOS/Linux:** `.github/skills/repo-memory/memory search --query "..." --user-id copilot`
+- **PowerShell/Windows:** `.github\skills\repo-memory\memory.ps1 search --query "..." --user-id copilot`
 
 ## Keep Artifacts Updated
 
