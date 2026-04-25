@@ -6,7 +6,7 @@ per session, all sharing the same partition key (cosmos_session_id).
 Uses CosmosMemoryClient from AgentMemoryToolkit under the hood, mapping:
   - user_id → agent/user identifier
   - thread_id → cosmos_session_id (our generated UUID)
-  - memory_type → "session_turn" or "session_meta"
+  - memory_type → "summary" (with doc_type="session_meta") or "turn" (with doc_type="session_turn")
 """
 
 from __future__ import annotations
@@ -24,9 +24,9 @@ class SessionStore:
     """Cosmos DB storage for session sync.
 
     Each session is stored as:
-    - One metadata document (memory_type="session_meta") with summary, fingerprint,
+    - One metadata document (memory_type="summary", doc_type="session_meta") with summary, fingerprint,
       platform_ids map, and session-level fields.
-    - N turn documents (memory_type="session_turn"), one per conversation message,
+    - N turn documents (memory_type="turn", doc_type="session_turn"), one per conversation message,
       ordered by turn_index.
 
     All documents for a session share thread_id = cosmos_session_id as the
@@ -78,7 +78,7 @@ class SessionStore:
         # Build and store metadata document
         meta_content = json.dumps({
             "session_id": cosmos_session_id,
-            "memory_type": "session_meta",
+            "doc_type": "session_meta",
             "platform": platform,
             "platform_session_id": platform_session_id,
             "platform_ids": platform_ids,
@@ -98,9 +98,10 @@ class SessionStore:
             thread_id=cosmos_session_id,
             role="system",
             content=meta.get("summary", "") or f"Session {cosmos_session_id}",
-            memory_type="session_meta",
+            memory_type="summary",
             metadata={
                 "doc_id": meta_doc_id,
+                "doc_type": "session_meta",
                 "session_id": cosmos_session_id,
                 "platform": platform,
                 "platform_session_id": platform_session_id,
@@ -127,9 +128,10 @@ class SessionStore:
                 thread_id=cosmos_session_id,
                 role=turn.get("role", "user"),
                 content=turn_content or f"[turn {i}]",
-                memory_type="session_turn",
+                memory_type="turn",
                 metadata={
                     "doc_id": turn_id,
+                    "doc_type": "session_turn",
                     "session_id": cosmos_session_id,
                     "platform_session_id": platform_session_id,
                     "platform": platform,
@@ -161,10 +163,10 @@ class SessionStore:
 
         for r in records:
             rec = r.model_dump() if hasattr(r, "model_dump") else r
-            mt = rec.get("memory_type", "")
-            if mt == "session_meta":
+            doc_type = (rec.get("metadata") or {}).get("doc_type", "")
+            if doc_type == "session_meta":
                 meta_record = rec
-            elif mt == "session_turn":
+            elif doc_type == "session_turn":
                 turn_records.append(rec)
 
         if meta_record is None:
@@ -213,8 +215,14 @@ class SessionStore:
         """
         records = self._client.get_memories(
             user_id=self._user_id,
-            memory_type="session_meta",
+            memory_type="summary",
         )
+
+        # Filter to session_meta docs only
+        records = [
+            r for r in records
+            if ((r.model_dump() if hasattr(r, "model_dump") else r).get("metadata") or {}).get("doc_type") == "session_meta"
+        ]
 
         results = []
         for r in records:
@@ -248,13 +256,15 @@ class SessionStore:
         results = self._client.search_cosmos(
             query=query,
             user_id=self._user_id,
-            memory_type="session_meta",
+            memory_type="summary",
             top_k=top_k,
         )
 
         sessions = []
         for r in results:
             rec = r.model_dump() if hasattr(r, "model_dump") else r
+            if ((rec.get("metadata") or {}).get("doc_type")) != "session_meta":
+                continue
             meta = rec.get("metadata", {}) or {}
             sessions.append({
                 "cosmos_session_id": meta.get("session_id", ""),
@@ -302,7 +312,7 @@ class SessionStore:
             )
             for r in records:
                 rec = r.model_dump() if hasattr(r, "model_dump") else r
-                if rec.get("memory_type") == "session_meta":
+                if (rec.get("metadata") or {}).get("doc_type") == "session_meta":
                     return rec.get("metadata", {})
         except Exception:
             pass
