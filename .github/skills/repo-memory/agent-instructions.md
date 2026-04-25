@@ -6,6 +6,8 @@ This repo has a persistent memory skill at `.github/skills/repo-memory/SKILL.md`
 
 You MUST save conversations to the persistent memory store. This is how context survives between sessions.
 
+When the user says **"export session"**, **"save session"**, or **"save this conversation"**, follow the steps below to store the conversation.
+
 ### Saving conversations (after every significant exchange)
 
 Generate a unique thread ID at the start of each session (e.g. a timestamp like `2026-04-25-1330`). Then after each significant exchange, store the turns:
