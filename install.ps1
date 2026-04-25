@@ -240,21 +240,22 @@ foreach ($tmpl in $Templates) {
 # ── 7. Update .gitignore ────────────────────────────────────────────────────
 Write-Header "Updating .gitignore"
 
-if (-not (Test-Path .gitignore)) { New-Item -ItemType File -Path .gitignore | Out-Null }
+$gitignorePath = Join-Path $WorkDir ".gitignore"
+if (-not (Test-Path $gitignorePath)) { Set-Content $gitignorePath "" -Encoding UTF8 }
 
 $gitignoreEntries = @(
     ".github/skills/repo-memory/",
     "__pycache__/",
     ".env"
 )
-$gitignoreContent = Get-Content .gitignore -Raw -ErrorAction SilentlyContinue
+$gitignoreContent = (Get-Content $gitignorePath -Raw -ErrorAction SilentlyContinue) ?? ""
 
 foreach ($entry in $gitignoreEntries) {
-    if ($gitignoreContent -notmatch [regex]::Escape($entry)) {
-        Add-Content .gitignore $entry
-        Write-Ok "Added '$entry' to .gitignore"
-    } else {
+    if ($gitignoreContent.Contains($entry)) {
         Write-Info "'$entry' already in .gitignore"
+    } else {
+        Add-Content -Path $gitignorePath -Value $entry
+        Write-Ok "Added '$entry' to .gitignore"
     }
 }
 
